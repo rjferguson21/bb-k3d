@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: private-registry
+  namespace: {{ .Release.Namespace }}
+type: kubernetes.io/dockerconfigjson
+data:
+  .dockerconfigjson: {{ printf "{\"auths\":{\"%s\":{\"username\":\"%s\",\"password\":\"%s\",\"email\":\"%s\",\"auth\":\"%s\"}}}" .Values.registry1.registry .Values.registry1.username .Values.registry1.password .Values.registry1.email (printf "%s:%s" .Values.registry1.username .Values.registry1.password | b64enc) | b64enc }} 

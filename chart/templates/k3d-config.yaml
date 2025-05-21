@@ -1,0 +1,62 @@
+# yaml-lanage-server: $schema=https://raw.githubusercontent.com/k3d-io/k3d/refs/heads/main/pkg/config/v1alpha5/schema.json
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: bb-helm 
+agents: {{ .Values.k3d.nodes }}
+subnet: {{ .Values.k3d.subnet }}
+kubeAPI:
+  hostIP: {{ .Values.k3d.serverIP }}
+  hostPort: "6443"
+hostAliases:
+  - ip: {{ .Values.k3d.hostAliases.passthrough.ip }}
+    hostnames: {{ toYaml .Values.k3d.hostAliases.passthrough.hostnames | nindent 6 }}
+  - ip: {{ .Values.k3d.hostAliases.public.ip }}
+    hostnames: {{ toYaml .Values.k3d.hostAliases.public.hostnames | nindent 6 }}
+volumes:
+  - volume: /etc/machine-id:/etc/machine-id
+    nodeFilters:
+      - server:0
+      - agent:*
+  - volume: /home/rob/cypress:/cypress
+    nodeFilters:
+      - server:0
+      - agent:*
+options:
+  k3d:
+    disableLoadbalancer: true
+  k3s:
+    extraArgs:
+      - arg: --tls-san={{ .Values.serverIP }}
+        nodeFilters:
+          - server:*
+      - arg: --disable=traefik
+        nodeFilters:
+          - server:*
+      - arg: --disable=servicelb
+        nodeFilters:
+          - server:*
+registries:
+  create:
+    name: repo1
+    proxy:
+      remoteURL: https://{{ .Values.registry1.registry }}
+      username: {{ .Values.registry1.username }}
+      password: {{ .Values.registry1.password }}
+    volumes:
+      - /home/rob/reg:/var/lib/registry
+  config: | 
+    mirrors:
+      "{{ .Values.registry1.registry }}":
+        endpoint:
+          - http://repo1:5000
+    configs:
+      {{ .Values.registry1.registry }}:
+        auth:
+          username: {{ .Values.registry1.username }}
+          password: {{ .Values.registry1.password }}
+files:
+  - description: 'Bootstrap'
+    source: bootstrap.yaml
+    destination: /var/lib/rancher/k3s/server/manifests/bootstrap.yaml
+  

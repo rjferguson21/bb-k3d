@@ -1,0 +1,158 @@
+k3d:
+  nodes: 3
+
+  serverIP: "192.168.1.174"
+
+  subnet: "172.28.0.0/16"
+ 
+  hostAliases:
+    passthrough:
+      ip: "172.28.0.3"
+      hostnames:
+        - keycloak.dev.bigbang.mil
+        - vault.dev.bigbang.mil
+    public:
+      ip: "172.28.0.2"
+      hostnames:
+        - gitlab.dev.bigbang.mil
+        - registry.dev.bigbang.mil
+        - kiali.dev.bigbang.mil
+        - argocd.dev.bigbang.mil
+        - prometheus.dev.bigbang.mil
+        - alertmanager.dev.bigbang.mil
+        - minio.dev.bigbang.mil
+        - minio-api.dev.bigbang.mil
+        - loki.dev.bigbang.mil
+        - grafana.dev.bigbang.mil
+        - twistlock.dev.bigbang.mil
+        - keycloak.dev.bigbang.mil
+        - sonarqube.dev.bigbang.mil
+
+registry1:
+  registry: "registry1.dso.mil"
+  username: "rob.ferguson"
+  email: "rferguson@bridgephase.com"
+  password: ""
+
+flux:
+  image:
+    repository: registry1.dso.mil/ironbank/fluxcd
+    tag: v1.2.0
+
+  helmController:
+    image: registry1.dso.mil/ironbank/fluxcd/helm-controller
+    tag: v1.2.0
+    resources:
+      limits:
+        cpu: 1800m
+        memory: 2Gi
+      requests:
+        cpu: 900m
+        memory: 1Gi
+    serviceAccount:
+      automountServiceAccountToken: false
+    podSecurityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+    containerSecurityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+      privileged: false
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+      runAsNonRoot: true
+      capabilities:
+        drop:
+          - ALL
+
+  kustomizeController:
+    image: registry1.dso.mil/ironbank/fluxcd/kustomize-controller
+    tag: v1.5.1
+    resources:
+      limits:
+        cpu: 600m
+        memory: 1200Mi
+      requests:
+        cpu: 300m
+        memory: 600Mi
+    serviceAccount:
+      automountServiceAccountToken: false
+    podSecurityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+    containerSecurityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+      privileged: false
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+      runAsNonRoot: true
+      capabilities:
+        drop:
+          - ALL
+
+  notificationController:
+    image: registry1.dso.mil/ironbank/fluxcd/notification-controller
+    tag: v1.5.0
+    resources:
+      limits:
+        cpu: 200m
+        memory: 400Mi
+      requests:
+        cpu: 100m
+        memory: 200Mi
+    serviceAccount:
+      automountServiceAccountToken: false
+    podSecurityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+    containerSecurityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+      privileged: false
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+      runAsNonRoot: true
+      capabilities:
+        drop:
+          - ALL
+
+  sourceController:
+    image: registry1.dso.mil/ironbank/fluxcd/source-controller
+    tag: v1.5.0
+    resources:
+      limits:
+        cpu: 600m
+        memory: 800Mi
+      requests:
+        cpu: 300m
+        memory: 384Mi
+    serviceAccount:
+      automountServiceAccountToken: false
+    podSecurityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+    containerSecurityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+      privileged: false
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+      runAsNonRoot: true
+      capabilities:
+        drop:
+          - ALL
+
+  # Common configurations for all controllers
+  commonLabels:
+    cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
+
+  imagePullSecrets:
+    - name: private-registry
+
+  terminationGracePeriodSeconds: 60
+    
