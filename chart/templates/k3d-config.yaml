@@ -18,7 +18,7 @@ volumes:
     nodeFilters:
       - server:0
       - agent:*
-  - volume: /home/rob/cypress:/cypress
+  - volume: {{ .Values.k3d.volumeBaseDir }}/cypress:/cypress
     nodeFilters:
       - server:0
       - agent:*
@@ -44,7 +44,7 @@ registries:
       username: {{ .Values.registry1.username }}
       password: {{ .Values.registry1.password }}
     volumes:
-      - /home/rob/reg:/var/lib/registry
+      - {{ .Values.k3d.volumeBaseDir }}/reg:/var/lib/registry
   config: | 
     mirrors:
       "{{ .Values.registry1.registry }}":

@@ -1,17 +1,3 @@
-istio:
-  ingressGateways:
-    public-ingressgateway:
-      type: "LoadBalancer"
-      kubernetesResourceSpec: 
-        service:
-          loadBalancerIP: "172.28.0.2"
-
-    passthrough-ingressgateway:
-      type: "LoadBalancer"
-      kubernetesResourceSpec: 
-        service:
-          loadBalancerIP: "172.28.0.3"
-
 istioGateway:
   values:
     gateways:

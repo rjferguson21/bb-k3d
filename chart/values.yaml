@@ -28,6 +28,8 @@ k3d:
         - keycloak.dev.bigbang.mil
         - sonarqube.dev.bigbang.mil
 
+  volumeBaseDir: "/home/rob"
+
 registry1:
   registry: "registry1.dso.mil"
   username: "rob.ferguson"
