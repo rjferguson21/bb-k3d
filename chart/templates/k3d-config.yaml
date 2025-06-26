@@ -27,7 +27,7 @@ options:
     disableLoadbalancer: true
   k3s:
     extraArgs:
-      - arg: --tls-san={{ .Values.serverIP }}
+      - arg: --tls-san={{ .Values.k3d.serverIP }}
         nodeFilters:
           - server:*
       - arg: --disable=traefik
