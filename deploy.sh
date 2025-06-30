@@ -15,5 +15,4 @@ helm upgrade --install bigbang $BIGBANG_DIR/chart \
   --namespace=bigbang --create-namespace \
   --values $BIGBANG_DIR/tests/test-values.yaml \
   --values $BIGBANG_DIR/chart/ingress-certs.yaml \
-  --values ./shared-values/static-public-gatewayip.yaml \
   --set=registryCredentials.username=$REGISTRY1_USERNAME

@@ -1,7 +1,7 @@
 k3d:
   nodes: 3
 
-  serverIP: "192.168.1.174"
+  serverIP: "127.0.0.1"
 
   subnet: "172.28.0.0/16"
  

@@ -1,0 +1,22 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: bigbang-k3d-dev-values
+  namespace: bigbang
+stringData:
+  etchost: |
+    {{- range $alias := .Values.k3d.hostAliases }}
+    {{ $alias.ip }} {{- range $hostname := $alias.hostnames }} {{ $hostname }} {{- end -}}
+    {{- end }}
+  values.yaml: |
+    istioGateway:
+      values:
+        gateways:
+          public:
+            upstream:
+              service:
+                loadBalancerIP: {{ .Values.k3d.hostAliases.public.ip }}
+          passthrough:
+            upstream:
+              service:
+                loadBalancerIP: {{ .Values.k3d.hostAliases.passthrough.ip }}
