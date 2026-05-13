@@ -1,0 +1,100 @@
+version: '3'
+
+vars:
+  CHART_DIR: chart
+  VALUES_FILE: mac/values.yaml
+  EXTRA_VALUES_FILE: '{{default "" .EXTRA_VALUES_FILE}}'
+  DIST_DIR: dist
+  BIGBANG_DIR: ../bigbang
+  REGISTRY_OVERRIDES: ../overrides/registryOverrides.yaml
+  POLICY_OVERRIDES: ../bigbang/docs/reference/configs/example/policy-overrides-k3d.yaml
+  USE_PUBLIC_IMAGES: "false"
+
+tasks:
+  default:
+    desc: List tasks for the mac local dev flow
+    cmd: task --list-all
+
+  build:cluster:
+    desc: Generate bootstrap.yaml and k3d.yaml for macOS
+    dir: ..
+    vars:
+      USE_PUBLIC: '{{default "false" .USE_PUBLIC_IMAGES}}'
+      VALUES_FLAG: '{{if eq .USE_PUBLIC "true"}}-f {{.CHART_DIR}}/values-public.yaml{{end}}'
+      EXTRA_VALUES_FLAG: '{{if .EXTRA_VALUES_FILE}}-f {{.EXTRA_VALUES_FILE}}{{end}}'
+    preconditions:
+      - sh: test -n "${REGISTRY1_USERNAME}"
+        msg: "REGISTRY1_USERNAME environment variable must be set"
+      - sh: test -n "${REGISTRY1_PASSWORD}"
+        msg: "REGISTRY1_PASSWORD environment variable must be set"
+    cmds:
+      - mkdir -p {{.DIST_DIR}}
+      - |
+        helm template k3d {{.CHART_DIR}} \
+          -f {{.VALUES_FILE}} \
+          {{.VALUES_FLAG}} \
+          {{.EXTRA_VALUES_FLAG}} \
+          --set-string registry1.username="${REGISTRY1_USERNAME}" \
+          --set-string registry1.password="${REGISTRY1_PASSWORD}" \
+          --set-string registry1.email="${REGISTRY1_EMAIL}" \
+          > {{.DIST_DIR}}/bootstrap.yaml
+      - |
+        helm template k3d {{.CHART_DIR}} \
+          -f {{.VALUES_FILE}} \
+          {{.VALUES_FLAG}} \
+          {{.EXTRA_VALUES_FLAG}} \
+          --set=k3d.volumeBaseDir=$(pwd)/{{.DIST_DIR}} \
+          --set=k3d.machineIdHostPath=$(pwd)/{{.DIST_DIR}}/machine-id \
+          --set-string registry1.username="${REGISTRY1_USERNAME}" \
+          --set-string registry1.password="${REGISTRY1_PASSWORD}" \
+          --show-only=templates/k3d-config.yaml \
+          > {{.DIST_DIR}}/k3d.yaml
+
+  create:cluster:
+    desc: Create K3D cluster using dist/k3d.yaml
+    dir: ..
+    cmds:
+      - mkdir -p {{.DIST_DIR}}/cypress
+      - sh -c 'test -f {{.DIST_DIR}}/machine-id || uuidgen | tr -d \"-\" > {{.DIST_DIR}}/machine-id'
+      - k3d cluster delete --config {{.DIST_DIR}}/k3d.yaml
+      - k3d cluster create --config {{.DIST_DIR}}/k3d.yaml
+      - k3d kubeconfig get bb-helm > {{.DIST_DIR}}/kubeconfig.yaml
+
+  deploy:bigbang:
+    desc: Deploy Big Bang with the macOS dev values
+    dir: ..
+    preconditions:
+      - sh: test -d "{{.BIGBANG_DIR}}"
+        msg: "BIGBANG_DIR not found. Set BIGBANG_DIR to your bigbang repo path."
+      - sh: test -f "{{.REGISTRY_OVERRIDES}}"
+        msg: "REGISTRY_OVERRIDES not found (expected {{.REGISTRY_OVERRIDES}})"
+    cmds:
+      - |
+        yq eval 'select(.metadata.name == "bigbang-k3d-dev-values") | .stringData["values.yaml"]' \
+          {{.DIST_DIR}}/bootstrap.yaml > {{.DIST_DIR}}/dev-values.yaml
+      - |
+        helm upgrade --install bigbang {{.BIGBANG_DIR}}/chart \
+          --namespace=bigbang --create-namespace \
+          --values {{.BIGBANG_DIR}}/chart/ingress-certs.yaml \
+          --values {{.BIGBANG_DIR}}/tests/disable-core-values.yaml \
+          --values {{.POLICY_OVERRIDES}} \
+          --values {{.REGISTRY_OVERRIDES}} \
+          --values {{.DIST_DIR}}/dev-values.yaml \
+          --set=flux.interval=5s
+      - kubectl wait helmrelease -A --selector=app.kubernetes.io/instance=bigbang --for=condition=ready --timeout=800s
+
+  delete:cluster:
+    desc: Delete the K3D cluster and generated files (keeps dist/reg cache)
+    dir: ..
+    cmds:
+      - k3d cluster delete bb-helm || k3d cluster delete --config {{.DIST_DIR}}/k3d.yaml
+      - |
+        if [ -d "{{.DIST_DIR}}" ]; then \
+          find {{.DIST_DIR}} -mindepth 1 -maxdepth 1 ! -name reg -exec rm -rf {} +; \
+        fi
+
+  teardown:cluster:
+    desc: Delete the K3D cluster only (keeps dist and registry cache)
+    dir: ..
+    cmds:
+      - k3d cluster delete bb-helm || k3d cluster delete --config {{.DIST_DIR}}/k3d.yaml

@@ -9,6 +9,13 @@ k3d:
   serverIP: "127.0.0.1"
 
   subnet: "172.28.0.0/16"
+
+  # nodeFilters used for host port mappings (80/443)
+  portNodeFilters:
+    - "server:*"
+
+  # Host path for machine-id file mount
+  machineIdHostPath: "/etc/machine-id"
  
   hostAliases:
     passthrough:
@@ -34,7 +41,6 @@ k3d:
         - neuvector.dev.bigbang.mil
         - kibana.dev.bigbang.mil
         - harbor.dev.bigbang.mil
-        - backstage.dev.bigbang.mil
         - backstage.dev.bigbang.mil
         - chat.dev.bigbang.mil
 
@@ -170,4 +176,5 @@ flux:
     - name: private-registry
 
   terminationGracePeriodSeconds: 60
-    
+
+overrides: {}

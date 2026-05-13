@@ -15,7 +15,7 @@ hostAliases:
   - ip: {{ .Values.k3d.hostAliases.public.ip }}
     hostnames: {{ toYaml .Values.k3d.hostAliases.public.hostnames | nindent 6 }}
 volumes:
-  - volume: /etc/machine-id:/etc/machine-id
+  - volume: {{ default "/etc/machine-id" .Values.k3d.machineIdHostPath }}:/etc/machine-id
     nodeFilters:
       - server:0
       - agent:*
@@ -26,10 +26,10 @@ volumes:
 ports:
   - port: 80:80
     nodeFilters:
-      - server:*
+{{ toYaml .Values.k3d.portNodeFilters | nindent 6 }}
   - port: 443:443
     nodeFilters:
-      - server:*
+{{ toYaml .Values.k3d.portNodeFilters | nindent 6 }}
 options:
   k3s:
     extraArgs:

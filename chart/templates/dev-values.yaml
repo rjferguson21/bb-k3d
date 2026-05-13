@@ -9,14 +9,6 @@ stringData:
     {{ $alias.ip }} {{- range $hostname := $alias.hostnames }} {{ $hostname }} {{- end -}}
     {{- end }}
   values.yaml: |
-    istioGateway:
-      values:
-        gateways:
-          public:
-            upstream:
-              service:
-                loadBalancerIP: {{ .Values.k3d.hostAliases.public.ip }}
-          passthrough:
-            upstream:
-              service:
-                loadBalancerIP: {{ .Values.k3d.hostAliases.passthrough.ip }}
+    {{- $generatedValues := dict "istioGateway" (dict "values" (dict "gateways" (dict "public" (dict "upstream" (dict "service" (dict "loadBalancerIP" .Values.k3d.hostAliases.public.ip))) "passthrough" (dict "upstream" (dict "service" (dict "loadBalancerIP" .Values.k3d.hostAliases.passthrough.ip)))))) }}
+    {{- $devValues := mergeOverwrite (deepCopy $generatedValues) (.Values.overrides | default dict) }}
+{{ toYaml $devValues | nindent 4 }}

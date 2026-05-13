@@ -22,11 +22,11 @@ The relationship between these configurations is important:
 ```sh
 BIGBANG_DIR=/home/rob/bb/bigbang
 
-helm template oci://ghcr.io/rjferguson21/bb-k3d:0.2.7 > dist/bootstrap.yaml
-helm template oci://ghcr.io/rjferguson21/bb-k3d:0.2.7 \
+helm template oci://ghcr.io/rjferguson21/bb-k3d:0.2.10 > dist/bootstrap.yaml
+helm template oci://ghcr.io/rjferguson21/bb-k3d:0.2.10 \
   --set=k3d.volumeBaseDir=$(pwd)/dist \
-  --set=registry1.username='${REGISTRY1_USERNAME}' \
-  --set=registry1.password='${REGISTRY1_PASSWORD}' \
+  --set-string=registry1.username="${REGISTRY1_USERNAME}" \
+  --set-string=registry1.password="${REGISTRY1_PASSWORD}" \
   --show-only=templates/k3d-config.yaml > dist/k3d.yaml
 
 k3d cluster delete --config dist/k3d.yaml && k3d cluster create --config dist/k3d.yaml
@@ -37,3 +37,19 @@ helm upgrade --install bigbang $BIGBANG_DIR/chart \
   --values $BIGBANG_DIR/tests/test-values.yaml \
   --values $BIGBANG_DIR/chart/ingress-certs.yaml
 ```
+
+## macOS local flow
+
+The default chart values target a Linux host. For macOS, use the files under
+`mac/` to map host ports through the k3d load balancer and mount a generated
+machine-id file instead of `/etc/machine-id`.
+
+```sh
+source ./mac/source-registry-creds.sh
+cd mac
+task build:cluster
+task create:cluster
+task deploy:bigbang
+```
+
+See `mac/README.md` for the full workflow and cleanup commands.

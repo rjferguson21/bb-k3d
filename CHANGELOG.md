@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2]
+
+### Added
+
+- Added macOS local dev flow with Taskfile helpers and default Big Bang override values.
+- Added configurable k3d machine-id host path and port node filters.
+- Added Big Bang namespace bootstrap manifest for generated dev values.
+
+### Changed
+
+- Updated generated dev values to merge chart-provided `overrides`.
+- Used `--set-string` for registry credentials in Taskfile rendering.
+
 ## [0.3.1]
 
 ### Changed

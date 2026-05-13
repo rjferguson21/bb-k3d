@@ -63,3 +63,22 @@ tests:
       - matchRegex:
           path: options.k3s.extraArgs[1].arg
           pattern: "--tls-san=192.168.1.100"
+
+  - it: should use custom machine-id host path when specified
+    set:
+      k3d.machineIdHostPath: /tmp/bb-k3d-machine-id
+    asserts:
+      - equal:
+          path: volumes[0].volume
+          value: /tmp/bb-k3d-machine-id:/etc/machine-id
+
+  - it: should use custom port node filters when specified
+    set:
+      k3d.portNodeFilters[0]: loadbalancer
+    asserts:
+      - equal:
+          path: ports[0].nodeFilters[0]
+          value: loadbalancer
+      - equal:
+          path: ports[1].nodeFilters[0]
+          value: loadbalancer

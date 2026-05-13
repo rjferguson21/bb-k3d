@@ -1,0 +1,56 @@
+k3d:
+  nodes: 1
+
+  # Map host ports 80/443 to the k3d load balancer (macOS-friendly)
+  portNodeFilters:
+    - loadbalancer
+
+  hostAliases:
+    passthrough:
+      hostnames:
+        - keycloak.dev.bigbang.mil
+    public:
+      hostnames:
+        - neuvector.dev.bigbang.mil
+
+overrides:
+  # Keep this minimal for fast local iteration
+  networkPolicies:
+    enabled: false
+
+  istioCRDs:
+    enabled: true
+  istiod:
+    enabled: true
+  istioGateway:
+    enabled: true
+
+  kyverno:
+    enabled: true
+  kyvernoPolicies:
+    enabled: true
+
+  neuvector:
+    enabled: false
+
+  # Disable everything else by default
+  monitoring:
+    enabled: false
+  prometheusOperatorCRDs:
+    enabled: false
+  grafana:
+    enabled: false
+  loki:
+    enabled: false
+  tempo:
+    enabled: false
+  alloy:
+    enabled: false
+  kiali:
+    enabled: false
+  kyvernoReporter:
+    enabled: false
+  bbctl:
+    enabled: false
+  gatekeeper:
+    enabled: false

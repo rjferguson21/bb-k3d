@@ -46,7 +46,7 @@ tasks:
     vars:
       USE_PUBLIC: '{{default "false" .USE_PUBLIC_IMAGES}}'
       VALUES_FLAG: '{{if eq .USE_PUBLIC "true"}}-f {{.BIGBANG_K3D_CHART}}/values-public.yaml{{end}}'
-      CREDS_FLAG: '{{if ne .USE_PUBLIC "true"}}--set=registry1.username=${REGISTRY1_USERNAME} --set=registry1.password=${REGISTRY1_PASSWORD}{{end}}'
+      CREDS_FLAG: '{{if ne .USE_PUBLIC "true"}}--set-string=registry1.username=${REGISTRY1_USERNAME} --set-string=registry1.password=${REGISTRY1_PASSWORD}{{end}}'
     cmds:
       - mkdir -p dist
       - echo "Generating bootstrap.yaml (flux + metallb + nginx)"
