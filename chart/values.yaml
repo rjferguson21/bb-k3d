@@ -57,6 +57,9 @@ flux:
   helmController:
     image: registry1.dso.mil/ironbank/fluxcd/helm-controller
     tag: v1.5.4
+    container:
+      additionalArgs:
+        - "--requeue-dependency=10s"
     resources:
       limits:
         cpu: 1800m
