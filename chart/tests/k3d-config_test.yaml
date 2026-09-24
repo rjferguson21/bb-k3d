@@ -63,3 +63,19 @@ tests:
       - matchRegex:
           path: options.k3s.extraArgs[1].arg
           pattern: "--tls-san=192.168.1.100"
+
+  - it: should not set kubeAPI host by default
+    asserts:
+      - notExists:
+          path: kubeAPI.host
+
+  - it: should set kubeAPI host and tls-san when serverHost is specified
+    set:
+      k3d.serverHost: "3.30.39.237"
+    asserts:
+      - equal:
+          path: kubeAPI.host
+          value: 3.30.39.237
+      - matchRegex:
+          path: options.k3s.extraArgs[2].arg
+          pattern: "--tls-san=3.30.39.237"

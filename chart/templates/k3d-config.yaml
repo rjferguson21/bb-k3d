@@ -7,6 +7,9 @@ image: {{ .Values.k3d.image }}
 agents: {{ .Values.k3d.nodes }}
 subnet: {{ .Values.k3d.subnet }}
 kubeAPI:
+  {{- with .Values.k3d.serverHost }}
+  host: {{ . }}
+  {{- end }}
   hostIP: {{ .Values.k3d.serverIP }}
   hostPort: "6443"
 hostAliases:
@@ -41,6 +44,11 @@ options:
       - arg: --tls-san={{ .Values.k3d.serverIP }}
         nodeFilters:
           - server:*
+      {{- with .Values.k3d.serverHost }}
+      - arg: --tls-san={{ . }}
+        nodeFilters:
+          - server:*
+      {{- end }}
       - arg: --disable=traefik
         nodeFilters:
           - server:*

@@ -8,6 +8,11 @@ k3d:
 
   serverIP: "127.0.0.1"
 
+  # Hostname/IP written into the kubeconfig server URL and added as a TLS SAN.
+  # Set this when the docker host is remote (e.g. an EC2 public IP) and
+  # serverIP is a bind address like 0.0.0.0.
+  serverHost: ""
+
   subnet: "172.28.0.0/16"
  
   hostAliases:
