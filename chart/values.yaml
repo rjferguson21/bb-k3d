@@ -30,6 +30,7 @@ k3d:
         - argocd.dev.bigbang.mil
         - prometheus.dev.bigbang.mil
         - alertmanager.dev.bigbang.mil
+        - thanos.dev.bigbang.mil
         - minio.dev.bigbang.mil
         - minio-api.dev.bigbang.mil
         - loki.dev.bigbang.mil
