@@ -1,0 +1,81 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: '3'
+
+vars:
+  BIGBANG_DIR: /home/rob/bb/bigbang
+
+tasks:
+  ec2:
+    desc: Create an EC2 instance for BigBang development (docker only, no k3d)
+    cmds:
+      - "{{.ROOT_DIR}}/scripts/ec2-dev.sh"
+      - task: ec2:ssh-config
+      - task: ec2:post
+    status:
+      - cat dev.yaml
+      - docker --context bb-dev ps
+
+  ec2:post:
+    desc: Output basic metadata about instance
+    cmds:
+      - "aws ec2 describe-instances --filters \"Name=key-name,Values=$(aws sts get-caller-identity --query 'Arn' --output text | awk -F/ '{print $NF}' | tr -d '@')-dev\"
+        \"Name=instance-state-name,Values=running\"
+        --query 'Reservations[].Instances[] | sort_by(@, &LaunchTime)[-1]'
+        --output json | yq eval '{
+          \"INST_ID\": .InstanceId,
+          \"EC2_PUBLIC_IP\": .PublicIpAddress,
+          \"COMMAND_PREFIX\": \"ssh bb-dev\",
+          \"DOCKER_CONTEXT\": \"bb-dev\",
+          \"BASE_MOUNT_DIR\": \"/home/ubuntu\",
+          \"STATE\": .State.Name
+        }' > dev.yaml"
+      - task: ec2:docker-context
+
+  ec2:docker-context:
+    desc: Create or refresh the bb-dev docker context pointing at the EC2 instance
+    cmds:
+      - docker context rm -f bb-dev 2>/dev/null || true
+      - docker context create bb-dev --docker "host=ssh://bb-dev"
+    status:
+      - '[ "$(docker context inspect bb-dev -f "{{`{{.Endpoints.docker.Host}}`}}" 2>/dev/null)" = "ssh://bb-dev" ]'
+
+  ec2:ssh-config:
+    desc: Create or update SSH config host entry for the EC2 instance
+    vars:
+      AWS_USERNAME:
+        sh: aws sts get-caller-identity --query 'Arn' --output text | awk -F/ '{print $NF}' | tr -d '@'
+      EC2_PUBLIC_IP:
+        sh: aws ec2 describe-instances --filters "Name=key-name,Values={{.AWS_USERNAME}}-dev" "Name=instance-state-name,Values=pending,running,stopping,stopped" --query 'Reservations[].Instances[] | sort_by(@, &LaunchTime)[-1].PublicIpAddress' --output text
+      SSH_CONFIG: ~/.ssh/config
+      HOST_ENTRY: |
+        Host bb-dev
+          HostName {{.EC2_PUBLIC_IP}}
+          User ubuntu
+          IdentityFile ~/.ssh/{{.AWS_USERNAME}}-dev.pem
+          IdentitiesOnly yes
+          StrictHostKeyChecking no
+    cmds:
+      - |
+        # Check if the host entry already exists
+        if grep -q "^Host bb-dev$" {{.SSH_CONFIG}}; then
+          echo "Updating existing bb-dev entry in SSH config..."
+          # Remove existing entry (from "Host bb-dev" to the next "Host" or end of file)
+          awk '/^Host bb-dev$/{flag=1; next} /^Host /{flag=0} !flag' {{.SSH_CONFIG}} > {{.SSH_CONFIG}}.tmp
+          mv {{.SSH_CONFIG}}.tmp {{.SSH_CONFIG}}
+        else
+          echo "Adding new bb-dev entry to SSH config..."
+        fi
+
+        # Add the new/updated host entry
+        echo "" >> {{.SSH_CONFIG}}
+        echo "{{.HOST_ENTRY}}" >> {{.SSH_CONFIG}}
+
+        echo "SSH config updated successfully!"
+        echo "You can now connect using: ssh bb-dev"
+
+  ec2:destroy:
+    desc: Destroy EC2 instance for BigBang development
+    cmds:
+      - "{{.ROOT_DIR}}/scripts/ec2-dev.sh -d --recreate-cloud-instance"
+      - docker context rm -f bb-dev 2>/dev/null || true
+      - "rm -f dev.yaml"

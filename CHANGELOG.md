@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0]
+
+### Added
+
+- `k3d.name` value to set the k3d cluster name (default `bb-helm`), enabling multiple clusters on one host
+- `k3d.apiPort` value to set the Kubernetes API server host port (default `6443`)
+- `k3d.publishPorts` toggle to control host 80/443 publishing (default `true`); disable on secondary clusters
+- `k3d.metallb.addresses` value for the MetalLB pool so it tracks a custom `k3d.subnet` instead of a hardcoded range
+- `registry1.shared` toggle and `registry1.proxyName` value to reuse one external pull-through registry across clusters via `registries.use`
+
 ## [0.3.5]
 
 ### Added

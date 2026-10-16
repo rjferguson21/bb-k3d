@@ -79,3 +79,53 @@ tests:
       - matchRegex:
           path: options.k3s.extraArgs[2].arg
           pattern: "--tls-san=3.30.39.237"
+
+  - it: should use custom cluster name when specified
+    set:
+      k3d.name: bb-helm-b
+    asserts:
+      - equal:
+          path: metadata.name
+          value: bb-helm-b
+
+  - it: should use custom apiPort when specified
+    set:
+      k3d.apiPort: 6444
+    asserts:
+      - equal:
+          path: kubeAPI.hostPort
+          value: "6444"
+
+  - it: should publish host ports 80 and 443 by default
+    asserts:
+      - equal:
+          path: ports[0].port
+          value: 80:80
+      - equal:
+          path: ports[1].port
+          value: 443:443
+
+  - it: should omit host ports when publishPorts is false
+    set:
+      k3d.publishPorts: false
+    asserts:
+      - notExists:
+          path: ports
+
+  - it: should create a per-cluster proxy registry by default
+    asserts:
+      - equal:
+          path: registries.create.name
+          value: repo1
+      - notExists:
+          path: registries.use
+
+  - it: should use a shared external registry when registry1.shared is true
+    set:
+      registry1.shared: true
+    asserts:
+      - notExists:
+          path: registries.create
+      - equal:
+          path: registries.use[0]
+          value: k3d-repo1:5000
