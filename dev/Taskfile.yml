@@ -67,10 +67,14 @@ tasks:
 
   # Package Tasks
   package:default:
-    desc: Create a k3d cluster and deploy a BigBang package
+    desc: Create a k3d cluster and deploy a BigBang package. Cluster is named after the package unless CLUSTER_NAME is set.
+    vars:
+      CLUSTER_NAME: '{{.CLUSTER_NAME | default .PACKAGE}}'
     cmds:
       - task: k3d-create
+        vars: { CLUSTER_NAME: "{{.CLUSTER_NAME}}" }
       - task: external-dependencies
+        vars: { CLUSTER_NAME: "{{.CLUSTER_NAME}}" }
       - task: package:deploy
       - task: package:test
 
@@ -93,8 +97,10 @@ tasks:
     vars:
       BIGBANG_DIR: /home/rob/bb/bigbang
       TEST_VALUES: '{{.TEST_VALUES | default "tests/test-values.yaml"}}'
+      CLUSTER_NAME: '{{.CLUSTER_NAME | default .PACKAGE}}'
     cmds:
       - task: k3d-create
+        vars: { CLUSTER_NAME: "{{.CLUSTER_NAME}}" }
       - task: deploy
         vars:
           BIGBANG_DIR: "{{.BIGBANG_DIR}}"

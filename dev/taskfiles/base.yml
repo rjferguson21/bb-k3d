@@ -4,7 +4,6 @@ version: '3'
 vars:
   BIGBANG_DIR: /home/rob/bb/bigbang
   BIGBANG_K3D_CHART: '{{.ROOT_DIR}}/../chart'
-  CLUSTER_NAME: '{{.CLUSTER_NAME | default "bb-helm"}}'
   LOCAL_TMP: "{{.USER_WORKING_DIR}}/dev"
   # DOCKER_CONTEXT=bb-dev switches the whole workflow to the EC2 instance:
   # volume mounts land on the instance and host-side commands run over ssh.
@@ -23,11 +22,23 @@ tasks:
     desc: Create a k3d cluster for testing with flux and MetalLB
     dir: '{{.USER_WORKING_DIR}}'
     vars:
+      CLUSTER_NAME: '{{.CLUSTER_NAME | default "bb-helm"}}'
       # kubeconfig server URL / TLS SAN; derived from dev.yaml for the remote
       # docker context, overridable with SERVER_HOST=<host>
       SERVER_HOST:
         sh: if [ "{{.DOCKER_CONTEXT}}" = "bb-dev" ]; then yq '.EC2_PUBLIC_IP' {{.ROOT_DIR}}/dev.yaml; fi
-      TEMPLATE_VARS: --set=k3d.name={{.CLUSTER_NAME}} --set=k3d.serverIP="0.0.0.0" {{if .SERVER_HOST}}--set=k3d.serverHost={{.SERVER_HOST}}{{end}} --set=k3d.volumeBaseDir="{{.BASE_MOUNT_DIR}}" --set=registry1.username=$REGISTRY1_USERNAME --set=registry1.password=$REGISTRY1_PASSWORD
+      # For any non-default cluster, derive a collision-free 10.x subnet, matching
+      # gateway IPs / MetalLB pool, and API port from the name, and stop publishing
+      # host 80/443 (the default cluster owns them). bb-helm keeps the chart defaults.
+      CLUSTER_NET_VARS:
+        sh: |
+          name='{{.CLUSTER_NAME}}'
+          [ "$name" = "bb-helm" ] && exit 0
+          h=$(printf '%s' "$name" | cksum | cut -d' ' -f1)
+          o=$(( h % 254 + 1 ))
+          port=$(( 6444 + h % 1000 ))
+          printf '%s\n' "--set=k3d.subnet=10.$o.0.0/16 --set=k3d.metallb.addresses=10.$o.0.2-10.$o.0.5 --set=k3d.hostAliases.public.ip=10.$o.0.3 --set=k3d.hostAliases.passthrough.ip=10.$o.0.4 --set=k3d.apiPort=$port --set=k3d.publishPorts=false"
+      TEMPLATE_VARS: --set=k3d.name={{.CLUSTER_NAME}} --set=k3d.serverIP="0.0.0.0" {{if .SERVER_HOST}}--set=k3d.serverHost={{.SERVER_HOST}}{{end}} --set=k3d.volumeBaseDir="{{.BASE_MOUNT_DIR}}" --set=registry1.username=$REGISTRY1_USERNAME --set=registry1.password=$REGISTRY1_PASSWORD {{.CLUSTER_NET_VARS}}
     cmds:
       - mkdir -p {{.LOCAL_TMP}}
       - "{{.COMMAND_PREFIX}} mkdir -p {{.BASE_MOUNT_DIR}}/cypress"
@@ -53,6 +64,7 @@ tasks:
   external-dependencies:
     desc: "Start external PostgreSQL, Garage, and Valkey beside k3d and connect the cluster nodes to their network"
     vars:
+      CLUSTER_NAME: '{{.CLUSTER_NAME | default "bb-helm"}}'
       DEPENDENCIES_DIR: "{{.BIGBANG_DIR}}/docs/reference/scripts/developer/dependencies"
       K3D_DEV_POSTGRES_DATABASES: '{{.K3D_DEV_POSTGRES_DATABASES | default "gitlabhq_production,mattermost,anchore"}}'
       K3D_DEV_GARAGE_BUCKETS: '{{.K3D_DEV_GARAGE_BUCKETS | default ""}}'
