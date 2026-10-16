@@ -4,6 +4,8 @@ version: '3'
 vars:
   BIGBANG_DIR: /home/rob/bb/bigbang
   BIGBANG_K3D_CHART: '{{.ROOT_DIR}}/../chart'
+  REGISTRY: '{{.REGISTRY | default "registry1.dso.mil"}}'
+  REGISTRY_NAME: '{{.REGISTRY_NAME | default "repo1"}}'
   LOCAL_TMP: "{{.USER_WORKING_DIR}}/dev"
   # DOCKER_CONTEXT=bb-dev switches the whole workflow to the EC2 instance:
   # volume mounts land on the instance and host-side commands run over ssh.
@@ -18,6 +20,16 @@ env:
   DOCKER_CONTEXT: '{{.DOCKER_CONTEXT | default "default"}}'
 
 tasks:
+  shared-registry:
+    desc: Ensure the shared registry1 pull-through cache exists (reused across clusters, survives cluster deletes)
+    status:
+      - docker inspect k3d-{{.REGISTRY_NAME}} >/dev/null 2>&1
+    cmds:
+      - "{{.COMMAND_PREFIX}} mkdir -p {{.BASE_MOUNT_DIR}}/reg"
+      - k3d registry create {{.REGISTRY_NAME}} --proxy-remote-url https://{{.REGISTRY}}
+        --proxy-username "$REGISTRY1_USERNAME" --proxy-password "$REGISTRY1_PASSWORD"
+        -v {{.BASE_MOUNT_DIR}}/reg:/var/lib/registry
+
   k3d-create:
     desc: Create a k3d cluster for testing with flux and MetalLB
     dir: '{{.USER_WORKING_DIR}}'
@@ -38,8 +50,9 @@ tasks:
           o=$(( h % 254 + 1 ))
           port=$(( 6444 + h % 1000 ))
           printf '%s\n' "--set=k3d.subnet=10.$o.0.0/16 --set=k3d.metallb.addresses=10.$o.0.2-10.$o.0.5 --set=k3d.hostAliases.public.ip=10.$o.0.3 --set=k3d.hostAliases.passthrough.ip=10.$o.0.4 --set=k3d.apiPort=$port --set=k3d.publishPorts=false"
-      TEMPLATE_VARS: --set=k3d.name={{.CLUSTER_NAME}} --set=k3d.serverIP="0.0.0.0" {{if .SERVER_HOST}}--set=k3d.serverHost={{.SERVER_HOST}}{{end}} --set=k3d.volumeBaseDir="{{.BASE_MOUNT_DIR}}" --set=registry1.username=$REGISTRY1_USERNAME --set=registry1.password=$REGISTRY1_PASSWORD {{.CLUSTER_NET_VARS}}
+      TEMPLATE_VARS: --set=k3d.name={{.CLUSTER_NAME}} --set=k3d.serverIP="0.0.0.0" {{if .SERVER_HOST}}--set=k3d.serverHost={{.SERVER_HOST}}{{end}} --set=k3d.volumeBaseDir="{{.BASE_MOUNT_DIR}}" --set=registry1.username=$REGISTRY1_USERNAME --set=registry1.password=$REGISTRY1_PASSWORD --set=registry1.shared=true --set=registry1.proxyName={{.REGISTRY_NAME}} {{.CLUSTER_NET_VARS}}
     cmds:
+      - task: shared-registry
       - mkdir -p {{.LOCAL_TMP}}
       - "{{.COMMAND_PREFIX}} mkdir -p {{.BASE_MOUNT_DIR}}/cypress"
       - echo "*" >{{.LOCAL_TMP}}/.gitignore

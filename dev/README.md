@@ -100,8 +100,9 @@ task k3d-create CLUSTER_NAME=bb-helm-b
 ```
 
 The cluster name alone isn't enough: the subnet, host ports (80/443/6443), and the
-pull-through registry are host-level singletons. For a second cluster, override the
-colliding values (e.g. `cluster-b.yaml` passed via `EXTRA_ARGS`/`--values`):
+pull-through registry are host-level singletons. The tasks handle these for you
+(see below), but if you template the chart by hand, override the colliding values
+(e.g. `cluster-b.yaml` passed via `--values`):
 
 ```yaml
 k3d:
@@ -120,13 +121,6 @@ k3d:
       hostnames: [gitlab.dev.bigbang.mil, ...]
 registry1:
   shared: true                     # reuse one cache instead of a per-cluster registry
-```
-
-With `registry1.shared: true`, create the shared pull-through registry once:
-
-```bash
-k3d registry create repo1 --proxy-remote-url https://registry1.dso.mil \
-  -v /home/rob/reg:/var/lib/registry
 ```
 
 ### A cluster per package
@@ -152,8 +146,13 @@ and its kube context is `k3d-<package>`. Override the name explicitly with
 
 The derivation hashes the name, so two names collide on the same subnet only ~1/254
 of the time; if that happens, pick a different `CLUSTER_NAME` or pass explicit
-`--set k3d.subnet=...` values. For a shared pull-through cache across these clusters,
-set `registry1.shared: true` (and create the registry once, below).
+`--set k3d.subnet=...` values.
+
+`k3d-create` also ensures a single shared pull-through registry (`k3d-repo1`) exists
+and points every cluster at it (`registry1.shared=true`), so the Iron Bank cache is
+created once, shared across clusters, and survives `k3d cluster delete`. Override its
+name/remote with `REGISTRY_NAME=` / `REGISTRY=`. To refresh credentials, delete it
+(`k3d registry delete k3d-repo1`) and let the next `k3d-create` recreate it.
 
 Note: the `*.dev.bigbang.mil` domain is shared via `/etc/hosts`, so only one BigBang
 is reachable by hostname at a time; the external dependencies (`k3d-dependencies`
