@@ -60,7 +60,7 @@ tasks:
     cmds:
       - task: setuphost
       - task: k3d-create
-      - task: external-dependencies
+      # - task: external-dependencies   # disabled for now
       - task: deploy
         vars:
           DISABLE_CORE: "{{.DISABLE_CORE}}"
@@ -73,8 +73,8 @@ tasks:
     cmds:
       - task: k3d-create
         vars: { CLUSTER_NAME: "{{.CLUSTER_NAME}}" }
-      - task: external-dependencies
-        vars: { CLUSTER_NAME: "{{.CLUSTER_NAME}}" }
+      # - task: external-dependencies   # disabled for now
+      #   vars: { CLUSTER_NAME: "{{.CLUSTER_NAME}}" }
       - task: package:deploy
       - task: package:test
 
