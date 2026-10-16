@@ -63,7 +63,13 @@ tasks:
       - cat {{.LOCAL_TMP}}/bootstrap.yaml | yq e 'select(.kind == "Simple")' > {{.LOCAL_TMP}}/k3d.yaml
       - cat {{.LOCAL_TMP}}/bootstrap.yaml | yq e 'select(.kind == "ConfigMap" and .metadata.name == "bigbang-k3d-dev-values") | .stringData["values.yaml"]' > {{.LOCAL_TMP}}/dev-values.yaml
       - cat {{.LOCAL_TMP}}/bootstrap.yaml | yq e 'select(.kind == "ConfigMap" and .metadata.name == "bigbang-k3d-dev-values") | .stringData["etchost"]' > {{.LOCAL_TMP}}/etchost
-      - k3d cluster delete {{.CLUSTER_NAME}} && k3d cluster create --config {{.LOCAL_TMP}}/k3d.yaml --image=rancher/k3s:v1.37.0-k3s1
+      - k3d cluster delete {{.CLUSTER_NAME}}
+      # The shared registry stays attached to the cluster network, so k3d cluster
+      # delete can't remove it; without this, create reuses the stale network and
+      # silently keeps the old subnet.
+      - docker network disconnect -f k3d-{{.CLUSTER_NAME}} k3d-{{.REGISTRY_NAME}} 2>/dev/null || true
+      - docker network rm k3d-{{.CLUSTER_NAME}} 2>/dev/null || true
+      - k3d cluster create --config {{.LOCAL_TMP}}/k3d.yaml --image=rancher/k3s:v1.37.0-k3s1
       - i=0; until kubectl get deployment helm-controller >/dev/null 2>&1 || [ $i -ge 3 ]; do sleep 1; i=$((i+1)); done
 
   setuphost:
