@@ -138,15 +138,17 @@ task -t /path/to/dev/Taskfile.yml package:default DISABLE_CORE=true
 ```
 
 For any cluster other than `bb-helm`, `k3d-create` auto-derives a collision-free
-`10.<n>.0.0/16` subnet, matching gateway IPs / MetalLB pool, and API port from the
-cluster name, and sets `publishPorts: false` (the default cluster owns host 80/443).
+`172.<16-27>.<n>.0/24` subnet (inside `172.16.0.0/12`, BigBang's default
+`controlPlaneCidr`, so kyverno and other packages allow egress to the kube API),
+matching gateway IPs / MetalLB pool, and API port from the cluster name, and sets
+`publishPorts: false` (the default cluster owns host 80/443).
 So no per-cluster values file is needed — `delete`/`create` is scoped to that cluster
 and its kube context is `k3d-<package>`. Override the name explicitly with
 `CLUSTER_NAME=<name>` if you don't want the package name.
 
-The derivation hashes the name, so two names collide on the same subnet only ~1/254
-of the time; if that happens, pick a different `CLUSTER_NAME` or pass explicit
-`--set k3d.subnet=...` values.
+The derivation hashes the name across 12×256 subnets, so collisions are rare; if two
+names do collide, pick a different `CLUSTER_NAME` or pass explicit `--set k3d.subnet=...`
+(and matching `k3d.metallb.addresses` / `k3d.hostAliases.*.ip`) values.
 
 `k3d-create` also ensures a single shared pull-through registry (`k3d-repo1`) exists
 and points every cluster at it (`registry1.shared=true`), so the Iron Bank cache is

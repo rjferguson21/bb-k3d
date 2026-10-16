@@ -39,17 +39,20 @@ tasks:
       # docker context, overridable with SERVER_HOST=<host>
       SERVER_HOST:
         sh: if [ "{{.DOCKER_CONTEXT}}" = "bb-dev" ]; then yq '.EC2_PUBLIC_IP' {{.ROOT_DIR}}/dev.yaml; fi
-      # For any non-default cluster, derive a collision-free 10.x subnet, matching
-      # gateway IPs / MetalLB pool, and API port from the name, and stop publishing
-      # host 80/443 (the default cluster owns them). bb-helm keeps the chart defaults.
+      # For any non-default cluster, derive a collision-free subnet, matching gateway
+      # IPs / MetalLB pool, and API port from the name, and stop publishing host 80/443
+      # (the default cluster owns them). bb-helm keeps the chart defaults.
+      # The subnet must stay inside 172.16.0.0/12 — BigBang's default controlPlaneCidr,
+      # which kyverno and other packages use to allow egress to the kube API server.
+      # Second octet 16-27 avoids bb-helm (172.28) and the deps network (172.30).
       CLUSTER_NET_VARS:
         sh: |
           name='{{.CLUSTER_NAME}}'
           [ "$name" = "bb-helm" ] && exit 0
           h=$(printf '%s' "$name" | cksum | cut -d' ' -f1)
-          o=$(( h % 254 + 1 ))
+          net="172.$(( 16 + h % 12 )).$(( (h / 12) % 256 ))"
           port=$(( 6444 + h % 1000 ))
-          printf '%s\n' "--set=k3d.subnet=10.$o.0.0/16 --set=k3d.metallb.addresses=10.$o.0.2-10.$o.0.5 --set=k3d.hostAliases.public.ip=10.$o.0.3 --set=k3d.hostAliases.passthrough.ip=10.$o.0.4 --set=k3d.apiPort=$port --set=k3d.publishPorts=false"
+          printf '%s\n' "--set=k3d.subnet=$net.0/24 --set=k3d.metallb.addresses=$net.2-$net.5 --set=k3d.hostAliases.public.ip=$net.3 --set=k3d.hostAliases.passthrough.ip=$net.4 --set=k3d.apiPort=$port --set=k3d.publishPorts=false"
       TEMPLATE_VARS: --set=k3d.name={{.CLUSTER_NAME}} --set=k3d.serverIP="0.0.0.0" {{if .SERVER_HOST}}--set=k3d.serverHost={{.SERVER_HOST}}{{end}} --set=k3d.volumeBaseDir="{{.BASE_MOUNT_DIR}}" --set=registry1.username=$REGISTRY1_USERNAME --set=registry1.password=$REGISTRY1_PASSWORD --set=registry1.shared=true --set=registry1.proxyName={{.REGISTRY_NAME}} {{.CLUSTER_NET_VARS}}
     cmds:
       - task: shared-registry
