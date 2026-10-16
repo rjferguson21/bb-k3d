@@ -129,6 +129,28 @@ k3d registry create repo1 --proxy-remote-url https://registry1.dso.mil \
   -v /home/rob/reg:/var/lib/registry
 ```
 
+### A cluster per package
+
+Naming the cluster after the package lets you keep several package dev environments
+up at once (e.g. `keycloak` and `gitlab`) without `package:default` tearing down the
+others. Run each from its package checkout:
+
+```bash
+# from the keycloak repo
+task -t /path/to/dev/Taskfile.yml package:default CLUSTER_NAME=keycloak DISABLE_CORE=true
+
+# from the gitlab repo (second cluster → override the host-level singletons)
+task -t /path/to/dev/Taskfile.yml package:default CLUSTER_NAME=gitlab DISABLE_CORE=true \
+  EXTRA_ARGS="--values cluster-gitlab.yaml"
+```
+
+`CLUSTER_NAME` flows through `package:default` → `k3d-create`, so delete/create is
+scoped to that cluster and its kube context is `k3d-<package>`. The package name is
+shown by `package:info`, so you can reuse it verbatim. Only the first cluster can
+publish `80/443` — give each additional one its own `cluster-<name>.yaml` (see the
+override values above) with a distinct `k3d.name`, `apiPort`, `subnet`,
+`metallb.addresses`, `hostAliases`, `publishPorts: false`, and `registry1.shared: true`.
+
 Note: the `*.dev.bigbang.mil` domain is shared via `/etc/hosts`, so only one BigBang
 is reachable by hostname at a time; the external dependencies (`k3d-dependencies`
 network and its databases) are also shared across clusters.
