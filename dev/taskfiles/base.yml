@@ -2,7 +2,10 @@
 version: '3'
 
 vars:
-  BIGBANG_DIR: /home/rob/bb/bigbang
+  # Base BigBang umbrella clone (used for the package path/namespace lookups).
+  # BIGBANG_DIR (where BigBang is deployed from) defaults to this per task; override
+  # per run to deploy from a different checkout/worktree (e.g. BIGBANG_DIR=/tmp/alloy-umb).
+  BIGBANG_BASE: /home/rob/bb/bigbang
   BIGBANG_K3D_CHART: '{{.ROOT_DIR}}/../chart'
   REGISTRY: '{{.REGISTRY | default "registry1.dso.mil"}}'
   REGISTRY_NAME: '{{.REGISTRY_NAME | default "repo1"}}'
@@ -87,6 +90,7 @@ tasks:
     desc: "Start external PostgreSQL, Garage, and Valkey beside k3d and connect the cluster nodes to their network"
     vars:
       CLUSTER_NAME: '{{.CLUSTER_NAME | default "bb-helm"}}'
+      BIGBANG_DIR: '{{.BIGBANG_DIR | default .BIGBANG_BASE}}'
       DEPENDENCIES_DIR: "{{.BIGBANG_DIR}}/docs/reference/scripts/developer/dependencies"
       K3D_DEV_POSTGRES_DATABASES: '{{.K3D_DEV_POSTGRES_DATABASES | default "gitlabhq_production,mattermost,anchore"}}'
       K3D_DEV_GARAGE_BUCKETS: '{{.K3D_DEV_GARAGE_BUCKETS | default ""}}'
@@ -98,8 +102,10 @@ tasks:
       - K3D_DEV_POSTGRES_DATABASES='{{.K3D_DEV_POSTGRES_DATABASES}}' K3D_DEV_GARAGE_BUCKETS='{{.K3D_DEV_GARAGE_BUCKETS}}' {{.DEPENDENCIES_DIR}}/manage.sh up
 
   deploy:
-    desc: "Deploy a BigBang instance to the k3d cluster. Use EXTRA_ARGS for additional values (e.g., EXTRA_ARGS='--values tests/test-values-ambient.yaml')"
+    desc: "Deploy a BigBang instance to the k3d cluster. Use EXTRA_ARGS for additional values (e.g., EXTRA_ARGS='--values tests/test-values-ambient.yaml'). Override BIGBANG_DIR to deploy from a specific umbrella checkout/worktree."
     dir: '{{.USER_WORKING_DIR}}'
+    vars:
+      BIGBANG_DIR: '{{.BIGBANG_DIR | default .BIGBANG_BASE}}'
     cmds:
       - helm upgrade --install bigbang {{.BIGBANG_DIR}}/chart
         --namespace=bigbang --create-namespace --values {{.BIGBANG_DIR}}/tests/test-values.yaml

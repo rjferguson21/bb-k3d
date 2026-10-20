@@ -2,7 +2,7 @@
 version: '3'
 
 vars:
-  BIGBANG_DIR: /home/rob/bb/bigbang
+  BIGBANG_BASE: /home/rob/bb/bigbang
   BIGBANG_K3D_CHART: '{{.ROOT_DIR}}/../chart'
   LOCAL_TMP: "{{.USER_WORKING_DIR}}/dev"
   PACKAGE:
@@ -15,7 +15,7 @@ vars:
         # Normalize: remove .git suffix and trailing slashes for comparison
         origin_normalized=$(echo "$origin_url" | sed 's/\.git$//' | sed 's:/$::')
         # Find path where git.repo matches (also normalized)
-        result=$(yq e '.. | select(has("git")) | select(.git.repo) | {"path": (path | join(".")), "repo": .git.repo}' /home/rob/bb/bigbang/chart/values.yaml | \
+        result=$(yq e '.. | select(has("git")) | select(.git.repo) | {"path": (path | join(".")), "repo": .git.repo}' {{.BIGBANG_BASE}}/chart/values.yaml | \
           awk -v origin="$origin_normalized" '
             /^path:/ { path = $2 }
             /^repo:/ {
@@ -32,15 +32,15 @@ vars:
       fi
       # Fallback: match by package name (kebab-case to camelCase)
       camel=$(echo "{{.PACKAGE}}" | sed -E 's/-([a-z])/\U\1/g')
-      yq e ".. | (select(has(\"git\")) or (select(has(\"helmRepo\")))) | (path | join(\".\")) | select(test(\"(?i)({{.PACKAGE}}|$camel)$\"))" /home/rob/bb/bigbang/chart/values.yaml | head -1
+      yq e ".. | (select(has(\"git\")) or (select(has(\"helmRepo\")))) | (path | join(\".\")) | select(test(\"(?i)({{.PACKAGE}}|$camel)$\"))" {{.BIGBANG_BASE}}/chart/values.yaml | head -1
   PACKAGE_NAMESPACE:
     sh: |
       # Try HelmRelease targetNamespace first, then values.yaml, then fall back to package name
-      ns=$(grep -h "targetNamespace:" /home/rob/bb/bigbang/chart/templates/{{.PACKAGE}}/helmrelease.yaml 2>/dev/null | head -1 | awk '{print $2}')
+      ns=$(grep -h "targetNamespace:" {{.BIGBANG_BASE}}/chart/templates/{{.PACKAGE}}/helmrelease.yaml 2>/dev/null | head -1 | awk '{print $2}')
       if [ -z "$ns" ] || echo "$ns" | grep -qF '{{ "{{" }}'; then
         pkg_path="{{.PACKAGE_PATH}}"
         if [ -n "$pkg_path" ]; then
-          ns=$(yq e ".$pkg_path.namespace // \"\"" /home/rob/bb/bigbang/chart/values.yaml)
+          ns=$(yq e ".$pkg_path.namespace // \"\"" {{.BIGBANG_BASE}}/chart/values.yaml)
         fi
       fi
       echo "${ns:-{{.PACKAGE}}}"
@@ -82,7 +82,6 @@ tasks:
     desc: Deploy BigBang with the current package branch from CWD. Use TEST_VALUES to swap the test values file (e.g., TEST_VALUES=tests/test-sso-values.yaml)
     dir: '{{.USER_WORKING_DIR}}'
     vars:
-      BIGBANG_DIR: /home/rob/bb/bigbang
       TEST_VALUES: '{{.TEST_VALUES | default "tests/test-values.yaml"}}'
     cmds:
       - task: deploy
@@ -95,7 +94,6 @@ tasks:
     desc: Test package upgrade from released version to current branch. Use TEST_VALUES to swap the test values file (e.g., TEST_VALUES=tests/test-sso-values.yaml)
     dir: '{{.USER_WORKING_DIR}}'
     vars:
-      BIGBANG_DIR: /home/rob/bb/bigbang
       TEST_VALUES: '{{.TEST_VALUES | default "tests/test-values.yaml"}}'
       CLUSTER_NAME: '{{.CLUSTER_NAME | default .PACKAGE}}'
     cmds:
