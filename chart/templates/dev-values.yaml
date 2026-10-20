@@ -9,7 +9,7 @@ stringData:
     {{ $alias.ip }} {{- range $hostname := $alias.hostnames }} {{ $hostname }} {{- end -}}
     {{- end }}
   values.yaml: |
-    istio:
+    packages:
       istioGateway:
         values:
           gateways:
