@@ -34,7 +34,7 @@ tasks:
         -v {{.BASE_MOUNT_DIR}}/reg:/var/lib/registry
 
   k3d-create:
-    desc: Create a k3d cluster for testing with flux and MetalLB
+    desc: Create a k3d cluster for testing with flux and MetalLB. Set CLUSTER_NAME to run multiple on one host (non-default names get an auto-derived subnet/API port).
     dir: '{{.USER_WORKING_DIR}}'
     vars:
       CLUSTER_NAME: '{{.CLUSTER_NAME | default "bb-helm"}}'

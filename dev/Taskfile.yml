@@ -67,7 +67,7 @@ tasks:
 
   # Package Tasks
   package:default:
-    desc: Create a k3d cluster and deploy a BigBang package. Cluster is named after the package unless CLUSTER_NAME is set.
+    desc: Create a k3d cluster and deploy a BigBang package. Cluster is named after the package unless CLUSTER_NAME is set; set BIGBANG_DIR to deploy from a specific umbrella checkout/worktree.
     vars:
       CLUSTER_NAME: '{{.CLUSTER_NAME | default .PACKAGE}}'
     cmds:
@@ -79,7 +79,7 @@ tasks:
       - task: package:test
 
   package:deploy:
-    desc: Deploy BigBang with the current package branch from CWD. Use TEST_VALUES to swap the test values file (e.g., TEST_VALUES=tests/test-sso-values.yaml)
+    desc: Deploy BigBang with the current package branch from CWD. Use TEST_VALUES to swap the test values file (e.g. TEST_VALUES=tests/test-sso-values.yaml); set BIGBANG_DIR to deploy from a specific umbrella checkout/worktree.
     dir: '{{.USER_WORKING_DIR}}'
     vars:
       TEST_VALUES: '{{.TEST_VALUES | default "tests/test-values.yaml"}}'
@@ -91,7 +91,7 @@ tasks:
           EXTRA_ARGS: -f {{.TEST_VALUES}} --set={{.PACKAGE_PATH}}.git.branch=$(git rev-parse --abbrev-ref HEAD) --set={{.PACKAGE_PATH}}.git.tag=null {{ .EXTRA_VALUES }}
 
   package:upgrade:
-    desc: Test package upgrade from released version to current branch. Use TEST_VALUES to swap the test values file (e.g., TEST_VALUES=tests/test-sso-values.yaml)
+    desc: Test package upgrade from released version to current branch. Use TEST_VALUES to swap the test values file (e.g. TEST_VALUES=tests/test-sso-values.yaml); set BIGBANG_DIR to deploy from a specific umbrella checkout/worktree.
     dir: '{{.USER_WORKING_DIR}}'
     vars:
       TEST_VALUES: '{{.TEST_VALUES | default "tests/test-values.yaml"}}'
