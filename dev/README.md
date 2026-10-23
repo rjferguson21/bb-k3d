@@ -25,9 +25,15 @@ export REGISTRY1_PASSWORD=<password>
 Everything runs against your local docker daemon by default:
 
 ```bash
-task                  # k3d cluster → BigBang → wait for ready
-task package:default # k3d cluster → deploy package from CWD → tests
+task                  # branch-named k3d cluster → BigBang from BIGBANG_DIR → router
+task package:default # package-named k3d cluster → deploy package from CWD → tests
 ```
+
+`task default` names the cluster after the umbrella branch in `BIGBANG_DIR` (override
+with `CLUSTER_NAME=`), deploys BigBang, and points the SNI router at it — so several
+umbrella branches run side by side and nothing mutates `/etc/hosts` per cluster. Pass
+`BIGBANG_DIR=<worktree>` to deploy a specific umbrella branch and `EXTRA_ARGS` for
+extra values.
 
 ## Remote development (EC2)
 
@@ -95,7 +101,8 @@ above against the EC2 instance.
 deletes every cluster — only the named one:
 
 ```bash
-task default                      # default cluster "bb-helm"
+task default                      # cluster named after the umbrella branch
+task default CLUSTER_NAME=bb-b    # a second umbrella cluster, explicit name
 task k3d-create CLUSTER_NAME=bb-helm-b
 ```
 
