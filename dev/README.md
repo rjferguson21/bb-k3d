@@ -156,9 +156,37 @@ created once, shared across clusters, and survives `k3d cluster delete`. Overrid
 name/remote with `REGISTRY_NAME=` / `REGISTRY=`. To refresh credentials, delete it
 (`k3d registry delete k3d-repo1`) and let the next `k3d-create` recreate it.
 
-Note: the `*.dev.bigbang.mil` domain is shared via `/etc/hosts`, so only one BigBang
-is reachable by hostname at a time; the external dependencies (`k3d-dependencies`
-network and its databases) are also shared across clusters.
+Note: the `*.dev.bigbang.mil` domain is shared, so only one BigBang is reachable by
+hostname at a time; the external dependencies (`k3d-dependencies` network and its
+databases) are also shared across clusters.
+
+### Reaching a cluster by hostname: the host router
+
+Instead of rewriting `/etc/hosts` with each cluster's gateway IPs, run the host SNI
+router. It is one nginx container (`bb-k3d-router`, host network, ports 80/443) that
+forwards TLS connections unterminated to the target cluster's Istio ingress gateways
+based on the SNI hostname, the same pattern as the chart's in-cluster `nginx-router`
+and uds-k3d, but living on the host so it works for every cluster regardless of
+`publishPorts` and can be re-pointed without recreating anything.
+
+```bash
+task router CLUSTER_NAME=authservice     # start, or re-point a running router
+task router:stop
+```
+
+Gateway IPs and the hostname→gateway map are read from the live cluster
+(`istio=ingressgateway` services and VirtualServices); hosts without a route fall
+through to the public gateway. The generated config lives in
+`~/.cache/bb-k3d/router/nginx.conf`.
+
+One-time setup: point the `dev.bigbang.mil` names at loopback in `/etc/hosts`, one
+address per gateway (public hosts on `127.0.0.1`, passthrough hosts such as keycloak
+on `127.0.0.2`). `task router` prints the exact block when it is missing. The split
+matters: browsers coalesce HTTP/2 connections across hostnames that share an IP and
+a cert, and a coalesced connection keeps the SNI it was opened with, so with a single
+IP the browser would send prometheus requests down its keycloak connection and get
+Keycloak's "Resource not found" page. After that, switching clusters is just
+`task router CLUSTER_NAME=<other>`; no sudo, no browser restart.
 
 ## Project Structure
 

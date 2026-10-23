@@ -55,6 +55,7 @@ k3d:
         - backstage.dev.bigbang.mil
         - backstage.dev.bigbang.mil
         - chat.dev.bigbang.mil
+        - fortify.dev.bigbang.mil
 
   volumeBaseDir: "/home/rob"
 

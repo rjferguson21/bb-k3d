@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: '3'
+
+tasks:
+  default:
+    desc: Start or re-point the host SNI router (nginx on 80/443) at CLUSTER_NAME's Istio gateways; point *.dev.bigbang.mil at 127.0.0.1 in /etc/hosts once
+    vars:
+      CLUSTER_NAME: '{{.CLUSTER_NAME | default .PACKAGE}}'
+    cmds:
+      - '{{.TASKFILE_DIR}}/../scripts/router.sh {{.CLUSTER_NAME}}'
+
+  stop:
+    desc: Remove the host SNI router container
+    cmds:
+      - '{{.TASKFILE_DIR}}/../scripts/router.sh --stop'

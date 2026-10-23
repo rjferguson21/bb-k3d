@@ -50,6 +50,8 @@ includes:
     taskfile: ./taskfiles/aws.yml
   util:
     taskfile: ./taskfiles/util.yml
+  router:
+    taskfile: ./taskfiles/router.yml
   base:
     taskfile: ./taskfiles/base.yml
     flatten: true
@@ -60,7 +62,8 @@ tasks:
     cmds:
       - task: setuphost
       - task: k3d-create
-      # - task: external-dependencies   # disabled for now
+      - task: external-dependencies
+        vars: { BIGBANG_DIR: "{{.BIGBANG_DIR}}" }
       - task: deploy
         vars:
           DISABLE_CORE: "{{.DISABLE_CORE}}"
@@ -73,8 +76,8 @@ tasks:
     cmds:
       - task: k3d-create
         vars: { CLUSTER_NAME: "{{.CLUSTER_NAME}}" }
-      # - task: external-dependencies   # disabled for now
-      #   vars: { CLUSTER_NAME: "{{.CLUSTER_NAME}}" }
+      - task: external-dependencies
+        vars: { CLUSTER_NAME: "{{.CLUSTER_NAME}}", BIGBANG_DIR: "{{.BIGBANG_DIR}}" }
       - task: package:deploy
       - task: package:test
 
