@@ -5,7 +5,7 @@ metadata:
   namespace: metallb-system
 spec:
   addresses:
-  - 172.28.0.2-172.28.0.5
+  - {{ .Values.k3d.metallb.addresses }}
 ---
 apiVersion: metallb.io/v1beta1
 kind: BGPAdvertisement

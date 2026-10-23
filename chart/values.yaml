@@ -1,4 +1,6 @@
 k3d:
+  name: "bb-helm"
+
   nodes: 3
 
   image: "rancher/k3s:v1.33.3-k3s1"
@@ -8,13 +10,23 @@ k3d:
 
   serverIP: "127.0.0.1"
 
+  # Host port for the Kubernetes API server. Change per cluster to run several on one host.
+  apiPort: 6443
+
+  # Publish host ports 80/443. Disable on secondary clusters since the first one owns them.
+  publishPorts: true
+
   # Hostname/IP written into the kubeconfig server URL and added as a TLS SAN.
   # Set this when the docker host is remote (e.g. an EC2 public IP) and
   # serverIP is a bind address like 0.0.0.0.
   serverHost: ""
 
   subnet: "172.28.0.0/16"
- 
+
+  metallb:
+    # Address pool for MetalLB; must fall within subnet and cover the hostAliases IPs.
+    addresses: "172.28.0.2-172.28.0.5"
+
   hostAliases:
     passthrough:
       ip: "172.28.0.4"
@@ -43,6 +55,7 @@ k3d:
         - backstage.dev.bigbang.mil
         - backstage.dev.bigbang.mil
         - chat.dev.bigbang.mil
+        - fortify.dev.bigbang.mil
 
   volumeBaseDir: "/home/rob"
 
@@ -54,6 +67,13 @@ registry1:
   username: "rob.ferguson"
   email: "rferguson@bridgephase.com"
   password: ""
+
+  # Container name of the pull-through proxy registry.
+  proxyName: "repo1"
+
+  # Reuse one external registry (created once via `k3d registry create`) across clusters
+  # instead of creating a per-cluster one. Enable on multi-cluster hosts to share the cache.
+  shared: false
 
 flux:
   image:

@@ -1,0 +1,142 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: '3'
+
+vars:
+  # Base BigBang umbrella clone (used for the package path/namespace lookups).
+  # BIGBANG_DIR (where BigBang is deployed from) defaults to this per task; override
+  # per run to deploy from a different checkout/worktree (e.g. BIGBANG_DIR=/tmp/alloy-umb).
+  BIGBANG_BASE: /home/rob/bb/bigbang
+  BIGBANG_K3D_CHART: '{{.ROOT_DIR}}/../chart'
+  REGISTRY: '{{.REGISTRY | default "registry1.dso.mil"}}'
+  REGISTRY_NAME: '{{.REGISTRY_NAME | default "repo1"}}'
+  LOCAL_TMP: "{{.USER_WORKING_DIR}}/dev"
+  # DOCKER_CONTEXT=bb-dev switches the whole workflow to the EC2 instance:
+  # volume mounts land on the instance and host-side commands run over ssh.
+  # Defined here (not the root taskfile) so CLI vars are in scope when
+  # these templates evaluate.
+  BASE_MOUNT_DIR: '{{eq (.DOCKER_CONTEXT | default "") "bb-dev" | ternary "/home/ubuntu" (print .USER_WORKING_DIR "/dev")}}'
+  COMMAND_PREFIX: '{{.COMMAND_PREFIX | default (eq (.DOCKER_CONTEXT | default "") "bb-dev" | ternary "ssh bb-dev" "")}}'
+
+env:
+  # Select the docker endpoint for all docker/k3d commands,
+  # e.g. task default DOCKER_CONTEXT=bb-dev
+  DOCKER_CONTEXT: '{{.DOCKER_CONTEXT | default "default"}}'
+
+tasks:
+  shared-registry:
+    desc: Ensure the shared registry1 pull-through cache exists (reused across clusters, survives cluster deletes)
+    status:
+      - docker inspect k3d-{{.REGISTRY_NAME}} >/dev/null 2>&1
+    cmds:
+      - "{{.COMMAND_PREFIX}} mkdir -p {{.BASE_MOUNT_DIR}}/reg"
+      - k3d registry create {{.REGISTRY_NAME}} --proxy-remote-url https://{{.REGISTRY}}
+        --proxy-username "$REGISTRY1_USERNAME" --proxy-password "$REGISTRY1_PASSWORD"
+        -v {{.BASE_MOUNT_DIR}}/reg:/var/lib/registry
+
+  k3d-create:
+    desc: Create a k3d cluster for testing with flux and MetalLB. Set CLUSTER_NAME to run multiple on one host (non-default names get an auto-derived subnet/API port).
+    dir: '{{.USER_WORKING_DIR}}'
+    vars:
+      CLUSTER_NAME: '{{.CLUSTER_NAME | default "bb-helm"}}'
+      # kubeconfig server URL / TLS SAN; derived from dev.yaml for the remote
+      # docker context, overridable with SERVER_HOST=<host>
+      SERVER_HOST:
+        sh: if [ "{{.DOCKER_CONTEXT}}" = "bb-dev" ]; then yq '.EC2_PUBLIC_IP' {{.ROOT_DIR}}/dev.yaml; fi
+      # For any non-default cluster, derive a collision-free subnet, matching gateway
+      # IPs / MetalLB pool, and API port from the name, and stop publishing host 80/443
+      # (the default cluster owns them). bb-helm keeps the chart defaults.
+      # The subnet must stay inside 172.16.0.0/12 — BigBang's default controlPlaneCidr,
+      # which kyverno and other packages use to allow egress to the kube API server.
+      # Second octet 16-27 avoids bb-helm (172.28) and the deps network (172.30).
+      CLUSTER_NET_VARS:
+        sh: |
+          name='{{.CLUSTER_NAME}}'
+          [ "$name" = "bb-helm" ] && exit 0
+          h=$(printf '%s' "$name" | cksum | cut -d' ' -f1)
+          net="172.$(( 16 + h % 12 )).$(( (h / 12) % 256 ))"
+          port=$(( 6444 + h % 1000 ))
+          printf '%s\n' "--set=k3d.subnet=$net.0/24 --set=k3d.metallb.addresses=$net.2-$net.5 --set=k3d.hostAliases.public.ip=$net.3 --set=k3d.hostAliases.passthrough.ip=$net.4 --set=k3d.apiPort=$port --set=k3d.publishPorts=false"
+      TEMPLATE_VARS: --set=k3d.name={{.CLUSTER_NAME}} --set=k3d.serverIP="0.0.0.0" {{if .SERVER_HOST}}--set=k3d.serverHost={{.SERVER_HOST}}{{end}} --set=k3d.volumeBaseDir="{{.BASE_MOUNT_DIR}}" --set=registry1.username=$REGISTRY1_USERNAME --set=registry1.password=$REGISTRY1_PASSWORD --set=registry1.shared=true --set=registry1.proxyName={{.REGISTRY_NAME}} {{.CLUSTER_NET_VARS}}
+    cmds:
+      - task: shared-registry
+      - mkdir -p {{.LOCAL_TMP}}
+      - "{{.COMMAND_PREFIX}} mkdir -p {{.BASE_MOUNT_DIR}}/cypress"
+      - echo "*" >{{.LOCAL_TMP}}/.gitignore
+      - helm template k3d "{{.BIGBANG_K3D_CHART}}" {{.TEMPLATE_VARS}} > {{.LOCAL_TMP}}/bootstrap.yaml
+      - cat {{.LOCAL_TMP}}/bootstrap.yaml | yq e 'select(.kind == "Simple")' > {{.LOCAL_TMP}}/k3d.yaml
+      - cat {{.LOCAL_TMP}}/bootstrap.yaml | yq e 'select(.kind == "ConfigMap" and .metadata.name == "bigbang-k3d-dev-values") | .stringData["values.yaml"]' > {{.LOCAL_TMP}}/dev-values.yaml
+      - cat {{.LOCAL_TMP}}/bootstrap.yaml | yq e 'select(.kind == "ConfigMap" and .metadata.name == "bigbang-k3d-dev-values") | .stringData["etchost"]' > {{.LOCAL_TMP}}/etchost
+      - k3d cluster delete {{.CLUSTER_NAME}}
+      # The shared registry stays attached to the cluster network, so k3d cluster
+      # delete can't remove it; without this, create reuses the stale network and
+      # silently keeps the old subnet.
+      - docker network disconnect -f k3d-{{.CLUSTER_NAME}} k3d-{{.REGISTRY_NAME}} 2>/dev/null || true
+      - docker network rm k3d-{{.CLUSTER_NAME}} 2>/dev/null || true
+      - k3d cluster create --config {{.LOCAL_TMP}}/k3d.yaml --image=rancher/k3s:v1.37.0-k3s1
+      - i=0; until kubectl get deployment helm-controller >/dev/null 2>&1 || [ $i -ge 3 ]; do sleep 1; i=$((i+1)); done
+
+  setuphost:
+    desc: Sets up etc hosts for k3d cluster host, creates cypress directory
+    dir: '{{.USER_WORKING_DIR}}'
+    status:
+      - test -f {{.LOCAL_TMP}}/.setuphost-done
+    cmds:
+      - "{{ .COMMAND_PREFIX }} mkdir -p \"{{.BASE_MOUNT_DIR}}/cypress\""
+      - "{{ .COMMAND_PREFIX }} sudo sed -i '/dev.bigbang.mil/d' /etc/hosts"
+      - "cat {{.LOCAL_TMP}}/etchost | {{ .COMMAND_PREFIX }} sudo tee -a /etc/hosts"
+      - touch {{.LOCAL_TMP}}/.setuphost-done
+
+  external-dependencies:
+    desc: "Ensure external PostgreSQL, Garage, and Valkey run beside k3d and connect the cluster nodes to their network. Reuses running dependencies (shared across clusters); use external-dependencies:reset to recreate them"
+    vars:
+      CLUSTER_NAME: '{{.CLUSTER_NAME | default "bb-helm"}}'
+      BIGBANG_DIR: '{{.BIGBANG_DIR | default .BIGBANG_BASE}}'
+      DEPENDENCIES_DIR: "{{.BIGBANG_DIR}}/docs/reference/scripts/developer/dependencies"
+      K3D_DEV_POSTGRES_DATABASES: '{{.K3D_DEV_POSTGRES_DATABASES | default "gitlabhq_production,mattermost,anchore"}}'
+      K3D_DEV_GARAGE_BUCKETS: '{{.K3D_DEV_GARAGE_BUCKETS | default ""}}'
+    cmds:
+      - docker network inspect k3d-dependencies >/dev/null 2>&1 || docker network create --subnet 172.30.0.0/16 k3d-dependencies
+      # manage.sh up force-recreates every container, so only run it when one is missing
+      - |
+        for name in postgresql garage valkey; do
+          docker ps --filter "name=^bigbang-dev-$name$" --filter status=running -q | grep -q . || missing=true
+        done
+        if [ "${missing:-}" = true ]; then
+          K3D_DEV_POSTGRES_DATABASES='{{.K3D_DEV_POSTGRES_DATABASES}}' K3D_DEV_GARAGE_BUCKETS='{{.K3D_DEV_GARAGE_BUCKETS}}' {{.DEPENDENCIES_DIR}}/manage.sh up
+        else
+          for db in $(echo '{{.K3D_DEV_POSTGRES_DATABASES}}' | tr ',' ' '); do
+            docker exec bigbang-dev-postgresql psql -U ci -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$db'" | grep -q 1 \
+              || docker exec bigbang-dev-postgresql createdb -U ci -O ci "$db"
+          done
+        fi
+      - for container in $(docker ps --filter 'name=k3d-{{.CLUSTER_NAME}}-' --format '{{`{{.Names}}`}}'); do docker network connect k3d-dependencies "$container" 2>/dev/null || true; done
+
+  external-dependencies:reset:
+    desc: "Recreate the external dependencies from scratch (drops their volumes; affects every cluster using them)"
+    vars:
+      BIGBANG_DIR: '{{.BIGBANG_DIR | default .BIGBANG_BASE}}'
+      DEPENDENCIES_DIR: "{{.BIGBANG_DIR}}/docs/reference/scripts/developer/dependencies"
+      K3D_DEV_POSTGRES_DATABASES: '{{.K3D_DEV_POSTGRES_DATABASES | default "gitlabhq_production,mattermost,anchore"}}'
+      K3D_DEV_GARAGE_BUCKETS: '{{.K3D_DEV_GARAGE_BUCKETS | default ""}}'
+    cmds:
+      - docker ps -aq --filter 'name=bigbang-dev-' | xargs -r docker rm -f
+      - docker volume ls -q --filter 'name=bigbang-dev-' | xargs -r docker volume rm
+      - docker network inspect k3d-dependencies >/dev/null 2>&1 || docker network create --subnet 172.30.0.0/16 k3d-dependencies
+      - K3D_DEV_POSTGRES_DATABASES='{{.K3D_DEV_POSTGRES_DATABASES}}' K3D_DEV_GARAGE_BUCKETS='{{.K3D_DEV_GARAGE_BUCKETS}}' {{.DEPENDENCIES_DIR}}/manage.sh up
+
+  deploy:
+    desc: "Deploy a BigBang instance to the k3d cluster. Use EXTRA_ARGS for additional values (e.g., EXTRA_ARGS='--values tests/test-values-ambient.yaml'). Override BIGBANG_DIR to deploy from a specific umbrella checkout/worktree."
+    dir: '{{.USER_WORKING_DIR}}'
+    vars:
+      BIGBANG_DIR: '{{.BIGBANG_DIR | default .BIGBANG_BASE}}'
+    cmds:
+      - helm upgrade --install bigbang {{.BIGBANG_DIR}}/chart
+        --namespace=bigbang --create-namespace --values {{.BIGBANG_DIR}}/tests/test-values.yaml
+        {{if eq .DISABLE_CORE "true"}}--values {{.BIGBANG_DIR}}/tests/disable-core-values.yaml{{end}}
+        --values {{.BIGBANG_DIR}}/chart/ingress-certs.yaml
+        --values {{.LOCAL_TMP}}/dev-values.yaml
+        --set=registryCredentials.username=$REGISTRY1_USERNAME
+        --set=registryCredentials.password=$REGISTRY1_PASSWORD
+        --set=flux.interval=5s
+        {{ .EXTRA_ARGS }}
+      - kubectl wait helmrelease -A --selector=app.kubernetes.io/instance=bigbang --for=condition=ready --timeout=800s
