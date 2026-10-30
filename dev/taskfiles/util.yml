@@ -6,29 +6,41 @@ tasks:
     desc: Check Prometheus targets health by pattern (e.g., task monitoring -- kube-state)
     vars:
       PROMETHEUS_URL: '{{.PROMETHEUS_URL | default "https://prometheus.dev.bigbang.mil"}}'
+    preconditions:
+      - sh: test -f {{.DEV_KUBECONFIG}}
+        msg: "No {{.DEV_KUBECONFIG}}; run from the directory you created the cluster in (or create one with k3d-create)"
     cmds:
-      - PROMETHEUS_URL="{{.PROMETHEUS_URL}}" {{.TASKFILE_DIR}}/../scripts/monitoring.sh {{.CLI_ARGS}}
+      - KUBECONFIG={{.DEV_KUBECONFIG}} PROMETHEUS_URL="{{.PROMETHEUS_URL}}" {{.TASKFILE_DIR}}/../scripts/monitoring.sh {{.CLI_ARGS}}
 
   network:
     desc: Check for Istio/Envoy networking errors in pod logs
     vars:
       NAMESPACE: '{{.NAMESPACE | default .PACKAGE_NAMESPACE}}'
       POD_PATTERN: '{{.POD_PATTERN | default ""}}'
+    preconditions:
+      - sh: test -f {{.DEV_KUBECONFIG}}
+        msg: "No {{.DEV_KUBECONFIG}}; run from the directory you created the cluster in (or create one with k3d-create)"
     cmds:
-      - '{{.TASKFILE_DIR}}/../scripts/network.sh {{.NAMESPACE}} {{.POD_PATTERN}}'
+      - 'KUBECONFIG={{.DEV_KUBECONFIG}} {{.TASKFILE_DIR}}/../scripts/network.sh {{.NAMESPACE}} {{.POD_PATTERN}}'
 
   ambient:
     desc: Check for Istio Ambient/ztunnel errors in logs
     vars:
       NAMESPACE: '{{.NAMESPACE | default "istio-system"}}'
       POD_PATTERN: '{{.POD_PATTERN | default "ztunnel"}}'
+    preconditions:
+      - sh: test -f {{.DEV_KUBECONFIG}}
+        msg: "No {{.DEV_KUBECONFIG}}; run from the directory you created the cluster in (or create one with k3d-create)"
     cmds:
-      - '{{.TASKFILE_DIR}}/../scripts/ambient.sh {{.NAMESPACE}} {{.POD_PATTERN}}'
+      - 'KUBECONFIG={{.DEV_KUBECONFIG}} {{.TASKFILE_DIR}}/../scripts/ambient.sh {{.NAMESPACE}} {{.POD_PATTERN}}'
 
   health:
     desc: "Fast deploy health check (HelmReleases, Flux sources, pods). Exit 0=ready, 2=progressing, 1=hard failure"
+    preconditions:
+      - sh: test -f {{.DEV_KUBECONFIG}}
+        msg: "No {{.DEV_KUBECONFIG}}; run from the directory you created the cluster in (or create one with k3d-create)"
     cmds:
-      - '{{.TASKFILE_DIR}}/../scripts/health.sh'
+      - 'KUBECONFIG={{.DEV_KUBECONFIG}} {{.TASKFILE_DIR}}/../scripts/health.sh'
 
   pending:
     desc: Check MR pipeline status and show failed jobs
