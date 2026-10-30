@@ -56,7 +56,7 @@ tasks:
           net="172.$(( 16 + h % 12 )).$(( (h / 12) % 256 ))"
           port=$(( 6444 + h % 1000 ))
           printf '%s\n' "--set=k3d.subnet=$net.0/24 --set=k3d.metallb.addresses=$net.2-$net.5 --set=k3d.hostAliases.public.ip=$net.3 --set=k3d.hostAliases.passthrough.ip=$net.4 --set=k3d.apiPort=$port --set=k3d.publishPorts=false"
-      TEMPLATE_VARS: --set=k3d.name={{.CLUSTER_NAME}} --set=k3d.serverIP="0.0.0.0" {{if .SERVER_HOST}}--set=k3d.serverHost={{.SERVER_HOST}}{{end}} --set=k3d.volumeBaseDir="{{.BASE_MOUNT_DIR}}" --set=registry1.username=$REGISTRY1_USERNAME --set=registry1.password=$REGISTRY1_PASSWORD --set=registry1.shared=true --set=registry1.proxyName={{.REGISTRY_NAME}} {{.CLUSTER_NET_VARS}}
+      TEMPLATE_VARS: --set=k3d.name={{.CLUSTER_NAME}} --set=k3d.serverIP="0.0.0.0" {{if .SERVER_HOST}}--set=k3d.serverHost={{.SERVER_HOST}}{{end}} --set=k3d.volumeBaseDir="{{.BASE_MOUNT_DIR}}" --set=registry1.username=$REGISTRY1_USERNAME --set=registry1.password=$REGISTRY1_PASSWORD --set=registry1.shared=true --set=registry1.proxyName={{.REGISTRY_NAME}} --set=k3d.updateDefaultKubeconfig=false {{.CLUSTER_NET_VARS}}
     cmds:
       - task: shared-registry
       - mkdir -p {{.LOCAL_TMP}}

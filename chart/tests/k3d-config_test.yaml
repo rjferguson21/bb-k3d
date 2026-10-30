@@ -96,6 +96,26 @@ tests:
           path: kubeAPI.hostPort
           value: "6444"
 
+  - it: should update the default kubeconfig by default
+    asserts:
+      - equal:
+          path: options.kubeconfig.updateDefaultKubeconfig
+          value: true
+      - equal:
+          path: options.kubeconfig.switchCurrentContext
+          value: true
+
+  - it: should leave the default kubeconfig alone when updateDefaultKubeconfig is false
+    set:
+      k3d.updateDefaultKubeconfig: false
+    asserts:
+      - equal:
+          path: options.kubeconfig.updateDefaultKubeconfig
+          value: false
+      - equal:
+          path: options.kubeconfig.switchCurrentContext
+          value: false
+
   - it: should publish host ports 80 and 443 by default
     asserts:
       - equal:
