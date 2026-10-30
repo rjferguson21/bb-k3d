@@ -5,6 +5,9 @@ vars:
   BIGBANG_BASE: /home/rob/bb/bigbang
   BIGBANG_K3D_CHART: '{{.ROOT_DIR}}/../chart'
   LOCAL_TMP: "{{.USER_WORKING_DIR}}/dev"
+  # Per-working-dir kubeconfig written by k3d-create. Passed inline because go-task
+  # never lets a Taskfile env override an exported KUBECONFIG.
+  DEV_KUBECONFIG: "{{.USER_WORKING_DIR}}/dev/kubeconfig"
   PACKAGE:
     sh: basename -s .git "$(git -C {{.USER_WORKING_DIR}} remote get-url origin 2>/dev/null)" 2>/dev/null || echo "keycloak"
   PACKAGE_PATH:
@@ -119,6 +122,7 @@ tasks:
       - |
         # deploy's HelmRelease wait can pass on the pre-upgrade revision before
         # flux fetches the branch; force reconciliation and wait for the upgrade
+        export KUBECONFIG={{.DEV_KUBECONFIG}}
         HR=$(kubectl get helmrelease -n bigbang -o json | jq -r --arg pkg "{{.PACKAGE}}" '.items[] | select(.spec.chart.spec.chart == $pkg or .metadata.name == $pkg) | .metadata.name' | head -1)
         flux reconcile source git {{.PACKAGE}} -n bigbang
         flux reconcile helmrelease "${HR:-{{.PACKAGE}}}" -n bigbang
@@ -139,12 +143,15 @@ tasks:
       PACKAGE:
         sh: cat chart/Chart.yaml | yq '.name'
       RELEASE_NAME:
-        sh: helm list -A -o json | jq -r '[.[] | select(.chart | startswith("{{.PACKAGE}}")) | .name] | join(" ")'
+        sh: KUBECONFIG={{.DEV_KUBECONFIG}} helm list -A -o json | jq -r '[.[] | select(.chart | startswith("{{.PACKAGE}}")) | .name] | join(" ")'
     dir: '{{.USER_WORKING_DIR}}'
+    preconditions:
+      - sh: test -f {{.DEV_KUBECONFIG}}
+        msg: "No {{.DEV_KUBECONFIG}}; run from the directory you created the cluster in (or create one with k3d-create)"
     cmds:
       - "{{.COMMAND_PREFIX}} rm -fr {{.BASE_MOUNT_DIR}}/cypress/*"
       - for: { var: RELEASE_NAME }
-        cmd: helm test {{.ITEM}} -n bigbang
+        cmd: KUBECONFIG={{.DEV_KUBECONFIG}} helm test {{.ITEM}} -n bigbang
 
   package:test:
     desc: Run all package tests (unit and e2e)

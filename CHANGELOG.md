@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `k3d.publishPorts` toggle to control host 80/443 publishing (default `true`); disable on secondary clusters
 - `k3d.metallb.addresses` value for the MetalLB pool so it tracks a custom `k3d.subnet` instead of a hardcoded range
 - `registry1.shared` toggle and `registry1.proxyName` value to reuse one external pull-through registry across clusters via `registries.use`
+- `k3d.updateDefaultKubeconfig` toggle (default `true`); the dev taskfile sets it `false` and writes a per-directory `dev/kubeconfig` instead
 
 ## [0.3.5]
 

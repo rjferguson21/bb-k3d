@@ -56,7 +56,7 @@ tasks:
           net="172.$(( 16 + h % 12 )).$(( (h / 12) % 256 ))"
           port=$(( 6444 + h % 1000 ))
           printf '%s\n' "--set=k3d.subnet=$net.0/24 --set=k3d.metallb.addresses=$net.2-$net.5 --set=k3d.hostAliases.public.ip=$net.3 --set=k3d.hostAliases.passthrough.ip=$net.4 --set=k3d.apiPort=$port --set=k3d.publishPorts=false"
-      TEMPLATE_VARS: --set=k3d.name={{.CLUSTER_NAME}} --set=k3d.serverIP="0.0.0.0" {{if .SERVER_HOST}}--set=k3d.serverHost={{.SERVER_HOST}}{{end}} --set=k3d.volumeBaseDir="{{.BASE_MOUNT_DIR}}" --set=registry1.username=$REGISTRY1_USERNAME --set=registry1.password=$REGISTRY1_PASSWORD --set=registry1.shared=true --set=registry1.proxyName={{.REGISTRY_NAME}} {{.CLUSTER_NET_VARS}}
+      TEMPLATE_VARS: --set=k3d.name={{.CLUSTER_NAME}} --set=k3d.serverIP="0.0.0.0" {{if .SERVER_HOST}}--set=k3d.serverHost={{.SERVER_HOST}}{{end}} --set=k3d.volumeBaseDir="{{.BASE_MOUNT_DIR}}" --set=registry1.username=$REGISTRY1_USERNAME --set=registry1.password=$REGISTRY1_PASSWORD --set=registry1.shared=true --set=registry1.proxyName={{.REGISTRY_NAME}} --set=k3d.updateDefaultKubeconfig=false {{.CLUSTER_NET_VARS}}
     cmds:
       - task: shared-registry
       - mkdir -p {{.LOCAL_TMP}}
@@ -73,7 +73,8 @@ tasks:
       - docker network disconnect -f k3d-{{.CLUSTER_NAME}} k3d-{{.REGISTRY_NAME}} 2>/dev/null || true
       - docker network rm k3d-{{.CLUSTER_NAME}} 2>/dev/null || true
       - k3d cluster create --config {{.LOCAL_TMP}}/k3d.yaml --image=rancher/k3s:v1.37.0-k3s1
-      - i=0; until kubectl get deployment helm-controller >/dev/null 2>&1 || [ $i -ge 3 ]; do sleep 1; i=$((i+1)); done
+      - k3d kubeconfig get {{.CLUSTER_NAME}} > {{.DEV_KUBECONFIG}} && chmod 600 {{.DEV_KUBECONFIG}}
+      - i=0; until KUBECONFIG={{.DEV_KUBECONFIG}} kubectl get deployment helm-controller >/dev/null 2>&1 || [ $i -ge 3 ]; do sleep 1; i=$((i+1)); done
 
   setuphost:
     desc: Sets up etc hosts for k3d cluster host, creates cypress directory
@@ -129,8 +130,11 @@ tasks:
     dir: '{{.USER_WORKING_DIR}}'
     vars:
       BIGBANG_DIR: '{{.BIGBANG_DIR | default .BIGBANG_BASE}}'
+    preconditions:
+      - sh: test -f {{.DEV_KUBECONFIG}}
+        msg: "No {{.DEV_KUBECONFIG}}; run from the directory you created the cluster in (or create one with k3d-create)"
     cmds:
-      - helm upgrade --install bigbang {{.BIGBANG_DIR}}/chart
+      - KUBECONFIG={{.DEV_KUBECONFIG}} helm upgrade --install bigbang {{.BIGBANG_DIR}}/chart
         --namespace=bigbang --create-namespace --values {{.BIGBANG_DIR}}/tests/test-values.yaml
         {{if eq .DISABLE_CORE "true"}}--values {{.BIGBANG_DIR}}/tests/disable-core-values.yaml{{end}}
         --values {{.BIGBANG_DIR}}/chart/ingress-certs.yaml
@@ -139,4 +143,4 @@ tasks:
         --set=registryCredentials.password=$REGISTRY1_PASSWORD
         --set=flux.interval=5s
         {{ .EXTRA_ARGS }}
-      - kubectl wait helmrelease -A --selector=app.kubernetes.io/instance=bigbang --for=condition=ready --timeout=800s
+      - KUBECONFIG={{.DEV_KUBECONFIG}} kubectl wait helmrelease -A --selector=app.kubernetes.io/instance=bigbang --for=condition=ready --timeout=800s

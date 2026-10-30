@@ -21,6 +21,9 @@ k3d:
   # serverIP is a bind address like 0.0.0.0.
   serverHost: ""
 
+  # Merge the cluster into the default kubeconfig and switch to its context on create.
+  updateDefaultKubeconfig: true
+
   subnet: "172.28.0.0/16"
 
   metallb:
