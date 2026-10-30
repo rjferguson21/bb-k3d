@@ -9,14 +9,15 @@ stringData:
     {{ $alias.ip }} {{- range $hostname := $alias.hostnames }} {{ $hostname }} {{- end -}}
     {{- end }}
   values.yaml: |
-    istioGateway:
-      values:
-        gateways:
-          public:
-            upstream:
-              service:
-                loadBalancerIP: {{ .Values.k3d.hostAliases.public.ip }}
-          passthrough:
-            upstream:
-              service:
-                loadBalancerIP: {{ .Values.k3d.hostAliases.passthrough.ip }}
+    packages:
+      istioGateway:
+        values:
+          gateways:
+            public:
+              upstream:
+                service:
+                  loadBalancerIP: {{ .Values.k3d.hostAliases.public.ip }}
+            passthrough:
+              upstream:
+                service:
+                  loadBalancerIP: {{ .Values.k3d.hostAliases.passthrough.ip }}

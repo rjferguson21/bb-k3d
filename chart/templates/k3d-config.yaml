@@ -2,7 +2,7 @@
 apiVersion: k3d.io/v1alpha5
 kind: Simple
 metadata:
-  name: bb-helm
+  name: {{ .Values.k3d.name }}
 image: {{ .Values.k3d.image }}
 agents: {{ .Values.k3d.nodes }}
 subnet: {{ .Values.k3d.subnet }}
@@ -11,7 +11,7 @@ kubeAPI:
   host: {{ . }}
   {{- end }}
   hostIP: {{ .Values.k3d.serverIP }}
-  hostPort: "6443"
+  hostPort: "{{ .Values.k3d.apiPort }}"
 hostAliases:
   - ip: {{ .Values.k3d.hostAliases.passthrough.ip }}
     hostnames: {{ toYaml .Values.k3d.hostAliases.passthrough.hostnames | nindent 6 }}
@@ -26,6 +26,7 @@ volumes:
     nodeFilters:
       - server:0
       - agent:*
+{{- if .Values.k3d.publishPorts }}
 ports:
   - port: 80:80
     nodeFilters:
@@ -33,6 +34,7 @@ ports:
   - port: 443:443
     nodeFilters:
       - server:*
+{{- end }}
 options:
   k3s:
     extraArgs:
@@ -56,8 +58,12 @@ options:
         nodeFilters:
           - server:*
 registries:
+  {{- if .Values.registry1.shared }}
+  use:
+    - k3d-{{ .Values.registry1.proxyName }}:5000
+  {{- else }}
   create:
-    name: repo1
+    name: {{ .Values.registry1.proxyName }}
     proxy:
       remoteURL: https://{{ .Values.registry1.registry }}
       {{- if .Values.registry1.username }}
@@ -68,11 +74,12 @@ registries:
       {{- end }}
     volumes:
       - {{ .Values.k3d.volumeBaseDir }}/reg:/var/lib/registry
-  config: | 
+  {{- end }}
+  config: |
     mirrors:
       "{{ .Values.registry1.registry }}":
         endpoint:
-          - http://repo1:5000
+          - http://{{ if .Values.registry1.shared }}k3d-{{ end }}{{ .Values.registry1.proxyName }}:5000
     {{- if and .Values.registry1.username .Values.registry1.password }}
     configs:
       {{ .Values.registry1.registry }}:
