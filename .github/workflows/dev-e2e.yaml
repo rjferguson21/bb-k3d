@@ -13,9 +13,6 @@ jobs:
     timeout-minutes: 20
     env:
       TASKFILE: ${{ github.workspace }}/dev/Taskfile.yml
-      BIGBANG_BASE: ${{ runner.temp }}/bigbang
-      WORKDIR: ${{ runner.temp }}/work
-      DEV_KUBECONFIG: ${{ runner.temp }}/work/dev/kubeconfig
 
     steps:
       - name: Checkout code
@@ -35,18 +32,20 @@ jobs:
       # Stand-in for a Big Bang clone; the dev Taskfile only reads its values.yaml for package lookups
       - name: Prepare working directory
         run: |
+          BIGBANG_BASE=$RUNNER_TEMP/bigbang
+          WORKDIR=$RUNNER_TEMP/work
+          printf 'BIGBANG_BASE=%s\nWORKDIR=%s\nDEV_KUBECONFIG=%s\n' "$BIGBANG_BASE" "$WORKDIR" "$WORKDIR/dev/kubeconfig" >> "$GITHUB_ENV"
           mkdir -p "$BIGBANG_BASE/chart" "$WORKDIR" ~/.kube
           echo '{}' > "$BIGBANG_BASE/chart/values.yaml"
           printf 'apiVersion: v1\nkind: Config\ncurrent-context: sentinel\ncontexts: []\nclusters: []\nusers: []\n' > ~/.kube/config
           sha256sum ~/.kube/config > "$RUNNER_TEMP/kubeconfig.sha256"
 
       - name: Create cluster with k3d-create
-        working-directory: ${{ env.WORKDIR }}
-        run: task -t "$TASKFILE" k3d-create USE_PUBLIC_IMAGES=true
+        run: cd "$WORKDIR" && task -t "$TASKFILE" k3d-create USE_PUBLIC_IMAGES=true
 
       - name: Render the other tasks (dry run)
-        working-directory: ${{ env.WORKDIR }}
         run: |
+          cd "$WORKDIR"
           for t in default package:default package:upgrade router:default; do
             echo "::group::$t"
             task -t "$TASKFILE" --dry "$t" USE_PUBLIC_IMAGES=true
@@ -62,11 +61,10 @@ jobs:
           test "$(kubectl --kubeconfig "$DEV_KUBECONFIG" get nodes --no-headers | wc -l)" = 4
 
       - name: Shared registry uses the cache volume and is attached to the cluster
-        working-directory: ${{ env.WORKDIR }}
         run: |
           docker inspect -f '{{range .Mounts}}{{.Name}} {{end}}' k3d-repo1 | grep -qw k3d-repo1-cache
           docker network inspect k3d-bb-helm -f '{{range .Containers}}{{.Name}} {{end}}' | grep -qw k3d-repo1
-          task -t "$TASKFILE" --status shared-registry
+          cd "$WORKDIR" && task -t "$TASKFILE" --status shared-registry
 
       - name: Flux controllers are available
         run: |
@@ -89,9 +87,8 @@ jobs:
           case "$ip" in 172.28.0.[2-5]) ;; *) exit 1 ;; esac
 
       - name: Recreating the cluster reuses the shared registry
-        working-directory: ${{ env.WORKDIR }}
         run: |
-          task -t "$TASKFILE" k3d-create USE_PUBLIC_IMAGES=true
+          cd "$WORKDIR" && task -t "$TASKFILE" k3d-create USE_PUBLIC_IMAGES=true
           test "$(docker ps -q --filter name=^k3d-repo1$ | wc -l)" = 1
           docker network inspect k3d-bb-helm -f '{{range .Containers}}{{.Name}} {{end}}' | grep -qw k3d-repo1
           kubectl --kubeconfig "$DEV_KUBECONFIG" wait --for=condition=Ready nodes --all --timeout=300s
