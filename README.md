@@ -19,11 +19,12 @@ The relationship between these configurations is important:
 - Both configurations must be in sync for proper load balancer operation
 
 ## Build K3D config + flux/metallb bootstrap.yaml (see `deploy.sh`)
+<!-- x-release-please-start-version -->
 ```sh
 BIGBANG_DIR=/home/rob/bb/bigbang
 
-helm template oci://ghcr.io/rjferguson21/bb-k3d:0.2.7 > dist/bootstrap.yaml
-helm template oci://ghcr.io/rjferguson21/bb-k3d:0.2.7 \
+helm template oci://ghcr.io/rjferguson21/bb-k3d:0.4.0 > dist/bootstrap.yaml
+helm template oci://ghcr.io/rjferguson21/bb-k3d:0.4.0 \
   --set=k3d.volumeBaseDir=$(pwd)/dist \
   --set=registry1.username='${REGISTRY1_USERNAME}' \
   --set=registry1.password='${REGISTRY1_PASSWORD}' \
@@ -37,3 +38,4 @@ helm upgrade --install bigbang $BIGBANG_DIR/chart \
   --values $BIGBANG_DIR/tests/test-values.yaml \
   --values $BIGBANG_DIR/chart/ingress-certs.yaml
 ```
+<!-- x-release-please-end -->

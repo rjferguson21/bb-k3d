@@ -38,7 +38,7 @@ These IPs are critical - they must be:
 ```
 bb-k3d/
 ├── chart/                          # Helm chart
-│   ├── Chart.yaml                  # Chart metadata, version 0.2.7
+│   ├── Chart.yaml                  # Chart metadata (version managed by release-please)
 │   ├── values.yaml                 # Default configuration values
 │   ├── templates/
 │   │   ├── k3d-config.yaml        # K3D cluster configuration template
@@ -370,9 +370,9 @@ When making changes:
 
 1. **Maintain Template Compatibility**: Test with `helm template` before committing
 2. **Update Tests**: Add/update unit tests in `chart/tests/` for template changes
-3. **Version Appropriately**: Follow semantic versioning in Chart.yaml
+3. **Don't Bump Versions**: release-please owns `chart/Chart.yaml` `version`, `CHANGELOG.md` and the README chart tag; it opens a release PR from merged PR titles
 4. **Test Locally**: Run `task test` and `task test:unit` before committing
-5. **Document Changes**: Update CHANGELOG.md for user-facing changes
+5. **Conventional PR Titles**: PRs are squash-merged and the title must be `feat:`, `fix:`, `deps:`, `chore:`, `docs:`, `ci:`, `refactor:` or `test:` (`!` for breaking); that drives the version bump and changelog
 6. **Preserve Defaults**: Don't change default values without good reason; they're tuned for Big Bang
 
 ## Links & References
