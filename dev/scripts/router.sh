@@ -22,6 +22,13 @@ cluster="${1:?usage: router.sh <cluster-name> | --stop}"
 ctx="k3d-$cluster"
 mkdir -p "$dir"
 
+# Read the cluster straight from k3d so the router works from any directory,
+# whatever KUBECONFIG points at.
+KUBECONFIG=$(mktemp)
+export KUBECONFIG
+trap 'rm -f "$KUBECONFIG"' EXIT
+k3d kubeconfig get "$cluster" >"$KUBECONFIG"
+
 # Gateway services -> upstreams. Each istio=ingressgateway LoadBalancer becomes an
 # upstream named after the service; the one containing "public" is the default.
 gw_json=$(kubectl --context "$ctx" get svc -A -l istio=ingressgateway -o json)

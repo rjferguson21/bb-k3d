@@ -130,6 +130,22 @@ registry1:
   shared: true                     # reuse one cache instead of a per-cluster registry
 ```
 
+### Kubeconfig per working directory
+
+`k3d-create` never touches your global kubeconfig or current context. It writes the
+cluster's kubeconfig to `dev/kubeconfig` in the directory you ran it from, and every
+task that talks to the cluster (`deploy`, `package:*`, `util:*`) uses that file, even
+when `KUBECONFIG` is exported in your shell. Run follow-up tasks from the same
+directory; they fail fast if `dev/kubeconfig` is missing. For your own commands:
+
+```bash
+export KUBECONFIG=$PWD/dev/kubeconfig     # or: kubectl --kubeconfig dev/kubeconfig ...
+k3d kubeconfig merge <name> -d            # opt in to adding it to your default kubeconfig
+```
+
+`task router` reads the cluster's kubeconfig from k3d directly, so it works from any
+directory.
+
 ### A cluster per package
 
 `package:*` tasks name the cluster after the detected package (from the git remote;

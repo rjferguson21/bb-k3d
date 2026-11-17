@@ -36,6 +36,9 @@ ports:
       - server:*
 {{- end }}
 options:
+  kubeconfig:
+    updateDefaultKubeconfig: {{ .Values.k3d.updateDefaultKubeconfig }}
+    switchCurrentContext: {{ .Values.k3d.updateDefaultKubeconfig }}
   k3s:
     extraArgs:
       {{- if not .Values.k3d.metricsServer }}
