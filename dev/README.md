@@ -176,7 +176,9 @@ names do collide, pick a different `CLUSTER_NAME` or pass explicit `--set k3d.su
 `k3d-create` also ensures a single shared pull-through registry (`k3d-repo1`) exists
 and points every cluster at it (`registry1.shared=true`), so the Iron Bank cache is
 created once, shared across clusters, and survives `k3d cluster delete`. Override its
-name/remote with `REGISTRY_NAME=` / `REGISTRY=`. To refresh credentials, delete it
+name/remote with `REGISTRY_NAME=` / `REGISTRY=`. Cached layers live in the
+`k3d-repo1-cache` Docker volume, so recreating the registry keeps them; remove the
+volume to start the cache over. To refresh credentials, delete it
 (`k3d registry delete k3d-repo1`) and let the next `k3d-create` recreate it.
 
 Note: the `*.dev.bigbang.mil` domain is shared, so only one BigBang is reachable by
