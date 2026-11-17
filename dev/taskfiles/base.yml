@@ -25,13 +25,19 @@ env:
 tasks:
   shared-registry:
     desc: Ensure the shared registry1 pull-through cache exists (reused across clusters, survives cluster deletes)
+    vars:
+      # A named volume, not a bind mount under the working directory: the cache outlives
+      # whichever repo first created it, and a deleted dev/ dir silently breaks every pull.
+      CACHE_VOLUME: k3d-{{.REGISTRY_NAME}}-cache
     status:
-      - docker inspect k3d-{{.REGISTRY_NAME}} >/dev/null 2>&1
+      - docker inspect -f '{{`{{range .Mounts}}{{.Name}} {{end}}`}}' k3d-{{.REGISTRY_NAME}} 2>/dev/null | grep -qw {{.CACHE_VOLUME}}
     cmds:
-      - "{{.COMMAND_PREFIX}} mkdir -p {{.BASE_MOUNT_DIR}}/reg"
+      # Replaces a cache left on the old bind mount, then reattaches it to running clusters
+      - k3d registry delete k3d-{{.REGISTRY_NAME}} 2>/dev/null || true
       - k3d registry create {{.REGISTRY_NAME}} --proxy-remote-url https://{{.REGISTRY}}
         --proxy-username "$REGISTRY1_USERNAME" --proxy-password "$REGISTRY1_PASSWORD"
-        -v {{.BASE_MOUNT_DIR}}/reg:/var/lib/registry
+        -v {{.CACHE_VOLUME}}:/var/lib/registry
+      - for c in $(k3d cluster list -o json | jq -r '.[].name'); do docker network connect "k3d-$c" k3d-{{.REGISTRY_NAME}} 2>/dev/null || true; done
 
   k3d-create:
     desc: Create a k3d cluster for testing with flux and MetalLB. Set CLUSTER_NAME to run multiple on one host (non-default names get an auto-derived subnet/API port).
