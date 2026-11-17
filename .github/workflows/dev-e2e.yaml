@@ -38,7 +38,7 @@ jobs:
           mkdir -p "$BIGBANG_BASE/chart" "$WORKDIR" ~/.kube
           echo '{}' > "$BIGBANG_BASE/chart/values.yaml"
           printf 'apiVersion: v1\nkind: Config\ncurrent-context: sentinel\ncontexts: []\nclusters: []\nusers: []\n' > ~/.kube/config
-          sha256sum ~/.kube/config > "$RUNNER_TEMP/kubeconfig.sha256"
+          cp ~/.kube/config "$RUNNER_TEMP/kubeconfig.orig"
 
       - name: Create cluster with k3d-create
         run: cd "$WORKDIR" && task -t "$TASKFILE" k3d-create USE_PUBLIC_IMAGES=true
@@ -56,7 +56,7 @@ jobs:
         run: |
           test -f "$DEV_KUBECONFIG"
           test "$(stat -c %a "$DEV_KUBECONFIG")" = 600
-          sha256sum -c "$RUNNER_TEMP/kubeconfig.sha256"
+          diff -u "$RUNNER_TEMP/kubeconfig.orig" ~/.kube/config
           kubectl --kubeconfig "$DEV_KUBECONFIG" wait --for=condition=Ready nodes --all --timeout=300s
           test "$(kubectl --kubeconfig "$DEV_KUBECONFIG" get nodes --no-headers | wc -l)" = 4
 
@@ -92,7 +92,14 @@ jobs:
           test "$(docker ps -q --filter name=^k3d-repo1$ | wc -l)" = 1
           docker network inspect k3d-bb-helm -f '{{range .Containers}}{{.Name}} {{end}}' | grep -qw k3d-repo1
           kubectl --kubeconfig "$DEV_KUBECONFIG" wait --for=condition=Ready nodes --all --timeout=300s
-          sha256sum -c "$RUNNER_TEMP/kubeconfig.sha256"
+          diff -u "$RUNNER_TEMP/kubeconfig.orig" ~/.kube/config
+
+      - name: Recreating from another directory works
+        run: |
+          mkdir -p "$RUNNER_TEMP/other" && cd "$RUNNER_TEMP/other"
+          task -t "$TASKFILE" k3d-create USE_PUBLIC_IMAGES=true
+          kubectl --kubeconfig dev/kubeconfig wait --for=condition=Ready nodes --all --timeout=300s
+          diff -u "$RUNNER_TEMP/kubeconfig.orig" ~/.kube/config
 
       - name: Cluster state
         if: always()

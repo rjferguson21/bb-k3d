@@ -74,7 +74,8 @@ tasks:
       - cat {{.LOCAL_TMP}}/bootstrap.yaml | yq e 'select(.kind == "Simple")' > {{.LOCAL_TMP}}/k3d.yaml
       - cat {{.LOCAL_TMP}}/bootstrap.yaml | yq e 'select(.kind == "ConfigMap" and .metadata.name == "bigbang-k3d-dev-values") | .stringData["values.yaml"]' > {{.LOCAL_TMP}}/dev-values.yaml
       - cat {{.LOCAL_TMP}}/bootstrap.yaml | yq e 'select(.kind == "ConfigMap" and .metadata.name == "bigbang-k3d-dev-values") | .stringData["etchost"]' > {{.LOCAL_TMP}}/etchost
-      - k3d cluster delete {{.CLUSTER_NAME}}
+      # k3d rewrites whichever kubeconfig KUBECONFIG names on delete; keep that off ~/.kube/config
+      - KUBECONFIG={{.DEV_KUBECONFIG}} k3d cluster delete {{.CLUSTER_NAME}}
       # The shared registry stays attached to the cluster network, so k3d cluster
       # delete can't remove it; without this, create reuses the stale network and
       # silently keeps the old subnet.
