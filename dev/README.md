@@ -20,6 +20,11 @@ export REGISTRY1_USERNAME=<username>
 export REGISTRY1_PASSWORD=<password>
 ```
 
+The Big Bang clone used for package lookups defaults to `/home/rob/bb/bigbang`; set
+`BIGBANG_BASE=<path>` to use another. `k3d-create USE_PUBLIC_IMAGES=true` swaps the
+Iron Bank Flux images for public ones, so a cluster comes up without Registry1
+credentials (this is how CI runs it).
+
 ## Local development
 
 Everything runs against your local docker daemon by default:
