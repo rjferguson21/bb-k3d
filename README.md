@@ -23,8 +23,8 @@ The relationship between these configurations is important:
 ```sh
 BIGBANG_DIR=/home/rob/bb/bigbang
 
-helm template oci://ghcr.io/rjferguson21/bb-k3d:0.5.0 > dist/bootstrap.yaml
-helm template oci://ghcr.io/rjferguson21/bb-k3d:0.5.0 \
+helm template oci://ghcr.io/rjferguson21/bb-k3d:0.5.1 > dist/bootstrap.yaml
+helm template oci://ghcr.io/rjferguson21/bb-k3d:0.5.1 \
   --set=k3d.volumeBaseDir=$(pwd)/dist \
   --set=registry1.username='${REGISTRY1_USERNAME}' \
   --set=registry1.password='${REGISTRY1_PASSWORD}' \
