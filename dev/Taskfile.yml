@@ -2,18 +2,20 @@
 version: '3'
 
 vars:
-  BIGBANG_BASE: /home/rob/bb/bigbang
+  BIGBANG_BASE: '{{.BIGBANG_BASE | default "/home/rob/bb/bigbang"}}'
   BIGBANG_K3D_CHART: '{{.ROOT_DIR}}/../chart'
   LOCAL_TMP: "{{.USER_WORKING_DIR}}/dev"
   # Per-working-dir kubeconfig written by k3d-create. Passed inline because go-task
   # never lets a Taskfile env override an exported KUBECONFIG.
   DEV_KUBECONFIG: "{{.USER_WORKING_DIR}}/dev/kubeconfig"
   PACKAGE:
-    sh: basename -s .git "$(git -C {{.USER_WORKING_DIR}} remote get-url origin 2>/dev/null)" 2>/dev/null || echo "keycloak"
+    sh: |
+      pkg=$(basename -s .git "$(git -C {{.USER_WORKING_DIR}} remote get-url origin 2>/dev/null)" 2>/dev/null)
+      echo "${pkg:-keycloak}"
   PACKAGE_PATH:
     sh: |
       # Reverse lookup: find the values.yaml path by matching git.repo URL to origin remote
-      origin_url=$(git -C {{.USER_WORKING_DIR}} remote get-url origin 2>/dev/null)
+      origin_url=$(git -C {{.USER_WORKING_DIR}} remote get-url origin 2>/dev/null || true)
       if [ -n "$origin_url" ]; then
         # Normalize: remove .git suffix and trailing slashes for comparison
         origin_normalized=$(echo "$origin_url" | sed 's/\.git$//' | sed 's:/$::')
@@ -66,7 +68,7 @@ tasks:
       BIGBANG_DIR: '{{.BIGBANG_DIR | default .BIGBANG_BASE}}'
       BRANCH_NAME:
         sh: |
-          ref=$(git -C "{{.BIGBANG_DIR}}" rev-parse --abbrev-ref HEAD 2>/dev/null)
+          ref=$(git -C "{{.BIGBANG_DIR}}" rev-parse --abbrev-ref HEAD 2>/dev/null || true)
           [ "$ref" = HEAD ] && ref=$(git -C "{{.BIGBANG_DIR}}" rev-parse --short HEAD 2>/dev/null)
           echo "${ref:-bigbang}" | tr '[:upper:]/_' '[:lower:]--' | sed 's/[^a-z0-9-]//g' | cut -c1-30 | sed 's/^-*//; s/-*$//'
       CLUSTER_NAME: '{{.CLUSTER_NAME | default .BRANCH_NAME}}'

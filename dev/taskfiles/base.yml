@@ -5,7 +5,7 @@ vars:
   # Base BigBang umbrella clone (used for the package path/namespace lookups).
   # BIGBANG_DIR (where BigBang is deployed from) defaults to this per task; override
   # per run to deploy from a different checkout/worktree (e.g. BIGBANG_DIR=/tmp/alloy-umb).
-  BIGBANG_BASE: /home/rob/bb/bigbang
+  BIGBANG_BASE: '{{.BIGBANG_BASE | default "/home/rob/bb/bigbang"}}'
   BIGBANG_K3D_CHART: '{{.ROOT_DIR}}/../chart'
   REGISTRY: '{{.REGISTRY | default "registry1.dso.mil"}}'
   REGISTRY_NAME: '{{.REGISTRY_NAME | default "repo1"}}'
@@ -62,7 +62,9 @@ tasks:
           net="172.$(( 16 + h % 12 )).$(( (h / 12) % 256 ))"
           port=$(( 6444 + h % 1000 ))
           printf '%s\n' "--set=k3d.subnet=$net.0/24 --set=k3d.metallb.addresses=$net.2-$net.5 --set=k3d.hostAliases.public.ip=$net.3 --set=k3d.hostAliases.passthrough.ip=$net.4 --set=k3d.apiPort=$port --set=k3d.publishPorts=false"
-      TEMPLATE_VARS: --set=k3d.name={{.CLUSTER_NAME}} --set=k3d.serverIP="0.0.0.0" {{if .SERVER_HOST}}--set=k3d.serverHost={{.SERVER_HOST}}{{end}} --set=k3d.volumeBaseDir="{{.BASE_MOUNT_DIR}}" --set=registry1.username=$REGISTRY1_USERNAME --set=registry1.password=$REGISTRY1_PASSWORD --set=registry1.shared=true --set=registry1.proxyName={{.REGISTRY_NAME}} --set=k3d.updateDefaultKubeconfig=false {{.CLUSTER_NET_VARS}}
+      # USE_PUBLIC_IMAGES=true swaps Iron Bank images for public ones (CI without registry1 credentials)
+      PUBLIC_VALUES: '{{if eq (.USE_PUBLIC_IMAGES | default "false") "true"}}-f {{.BIGBANG_K3D_CHART}}/values-public.yaml{{end}}'
+      TEMPLATE_VARS: --set=k3d.name={{.CLUSTER_NAME}} --set=k3d.serverIP="0.0.0.0" {{if .SERVER_HOST}}--set=k3d.serverHost={{.SERVER_HOST}}{{end}} --set=k3d.volumeBaseDir="{{.BASE_MOUNT_DIR}}" --set=registry1.username=$REGISTRY1_USERNAME --set=registry1.password=$REGISTRY1_PASSWORD --set=registry1.shared=true --set=registry1.proxyName={{.REGISTRY_NAME}} --set=k3d.updateDefaultKubeconfig=false {{.CLUSTER_NET_VARS}} {{.PUBLIC_VALUES}}
     cmds:
       - task: shared-registry
       - mkdir -p {{.LOCAL_TMP}}
@@ -72,7 +74,8 @@ tasks:
       - cat {{.LOCAL_TMP}}/bootstrap.yaml | yq e 'select(.kind == "Simple")' > {{.LOCAL_TMP}}/k3d.yaml
       - cat {{.LOCAL_TMP}}/bootstrap.yaml | yq e 'select(.kind == "ConfigMap" and .metadata.name == "bigbang-k3d-dev-values") | .stringData["values.yaml"]' > {{.LOCAL_TMP}}/dev-values.yaml
       - cat {{.LOCAL_TMP}}/bootstrap.yaml | yq e 'select(.kind == "ConfigMap" and .metadata.name == "bigbang-k3d-dev-values") | .stringData["etchost"]' > {{.LOCAL_TMP}}/etchost
-      - k3d cluster delete {{.CLUSTER_NAME}}
+      # k3d rewrites whichever kubeconfig KUBECONFIG names on delete; keep that off ~/.kube/config
+      - KUBECONFIG={{.DEV_KUBECONFIG}} k3d cluster delete {{.CLUSTER_NAME}}
       # The shared registry stays attached to the cluster network, so k3d cluster
       # delete can't remove it; without this, create reuses the stale network and
       # silently keeps the old subnet.
