@@ -15,8 +15,17 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created }}
       version: ${{ steps.release.outputs.version }}
     steps:
+      # PRs opened with GITHUB_TOKEN don't trigger workflows, so the release PR would never get CI
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app-token
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
       - uses: googleapis/release-please-action@v4
         id: release
+        with:
+          token: ${{ steps.app-token.outputs.token }}
 
   # Tags created with GITHUB_TOKEN don't trigger other workflows, so publish from here.
   publish-chart:
